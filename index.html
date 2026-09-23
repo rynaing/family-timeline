@@ -32,6 +32,11 @@
 
   <nav id="decadeNav" class="decade-nav"></nav>
 
+  <div id="demoBanner" class="demo-banner hidden">
+    <span>You're viewing the demo timeline.</span>
+    <button id="demoCreateBtn" class="btn btn-small">Add your family</button>
+  </div>
+
   <main id="timeline" class="timeline">
     <div id="loadingState" class="state-msg">Loading your family's timeline&hellip;</div>
   </main>
@@ -40,6 +45,7 @@
     <span id="welcomeBackText"></span>
     <button id="welcomeSwitch" class="link-btn">switch family</button>
   </div>
+
 
   <!-- Room-code join overlay -->
   <div id="joinOverlay" class="overlay hidden">
@@ -51,6 +57,7 @@
       <button id="joinBtn" class="btn btn-primary btn-block">Join timeline</button>
       <div class="divider"><span>or</span></div>
       <button id="createFamilyBtn" class="btn btn-block">Add your family</button>
+      <button id="demoBtn" class="link-btn demo-link">Just looking? View the demo family</button>
     </div>
   </div>
 
