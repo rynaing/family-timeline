@@ -391,6 +391,81 @@ function importTimeline(file) {
   reader.readAsText(file);
 }
 
+/* ---------------- create family flow ---------------- */
+
+let pendingFamily = null;
+
+function openCreate() {
+  document.getElementById("createOverlay").classList.remove("hidden");
+  document.getElementById("createStep1").classList.remove("hidden");
+  document.getElementById("createStep2").classList.add("hidden");
+  document.getElementById("newFamilyName").value = "";
+  document.getElementById("createError").classList.add("hidden");
+  setTimeout(() => document.getElementById("newFamilyName").focus(), 60);
+}
+
+function closeCreate() {
+  document.getElementById("createOverlay").classList.add("hidden");
+}
+
+async function copyToClipboard(text, btn) {
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch {
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand("copy");
+    ta.remove();
+  }
+  const orig = btn.textContent;
+  btn.textContent = "Copied";
+  setTimeout(() => { btn.textContent = orig; }, 1500);
+}
+
+async function doCreateFamily() {
+  const name = document.getElementById("newFamilyName").value.trim();
+  const errEl = document.getElementById("createError");
+  errEl.classList.add("hidden");
+  if (!name) {
+    errEl.textContent = "Give your family a name first.";
+    errEl.classList.remove("hidden");
+    return;
+  }
+  const btn = document.getElementById("createGoBtn");
+  btn.disabled = true;
+  btn.textContent = "Creating\u2026";
+  try {
+    const anon = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    const { data, error } = await anon.rpc("create_family", { fname: name });
+    if (error || !data || !data.length) {
+      throw new Error((error && error.message) || "Couldn't create the family \u2014 try again.");
+    }
+    const f = data[0];
+    pendingFamily = { id: f.family_id, name: f.family_name };
+    document.getElementById("newRoomCode").textContent = f.invite_code;
+    document.getElementById("newOwnerSecret").textContent = f.owner_secret;
+    document.getElementById("createStep1").classList.add("hidden");
+    document.getElementById("createStep2").classList.remove("hidden");
+  } catch (e) {
+    errEl.textContent = e.message;
+    errEl.classList.remove("hidden");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Create family";
+  }
+}
+
+function enterCreatedFamily() {
+  if (!pendingFamily) return;
+  localStorage.setItem(LS_FAMILY, JSON.stringify(pendingFamily));
+  const fam = pendingFamily;
+  pendingFamily = null;
+  closeCreate();
+  enterFamily(fam);
+}
+
 /* ---------------- init ---------------- */
 
 function initTheme() {
@@ -443,9 +518,23 @@ document.addEventListener("DOMContentLoaded", () => {
   const doJoin = () => joinWithCode(document.getElementById("roomCodeInput").value);
   document.getElementById("joinBtn").onclick = doJoin;
   document.getElementById("roomCodeInput").addEventListener("keydown", (e) => {
-    if (e.key === "Enter") doJoin;
     if (e.key === "Enter") doJoin();
   });
+
+  document.getElementById("createFamilyBtn").onclick = openCreate;
+  document.getElementById("createBackBtn").onclick = closeCreate;
+  document.getElementById("createGoBtn").onclick = doCreateFamily;
+  document.getElementById("newFamilyName").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") doCreateFamily();
+  });
+  document.getElementById("createOverlay").addEventListener("click", (e) => {
+    if (e.target.id === "createOverlay") closeCreate();
+  });
+  document.getElementById("copyCodeBtn").onclick = (e) =>
+    copyToClipboard(document.getElementById("newRoomCode").textContent, e.target);
+  document.getElementById("copySecretBtn").onclick = (e) =>
+    copyToClipboard(document.getElementById("newOwnerSecret").textContent, e.target);
+  document.getElementById("enterTimelineBtn").onclick = enterCreatedFamily;
 
   if (!silentRejoin()) {
     document.getElementById("joinOverlay").classList.remove("hidden");
