@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Family Timeline</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark">&#10022;</span>
+      <div>
+        <h1>Family Timeline</h1>
+        <p id="familyName" class="family-name"></p>
+      </div>
+    </div>
+    <div class="topbar-actions">
+      <button id="addEntryBtn" class="btn btn-primary" title="Add a memory">&#43; Add</button>
+      <button id="eyeBtn" class="btn btn-icon" title="Privacy mode: hide stories &amp; photos">&#128065;</button>
+      <button id="themeBtn" class="btn btn-icon" title="Toggle dark mode">&#9790;</button>
+      <button id="menuBtn" class="btn btn-icon" title="Menu">&#9776;</button>
+    </div>
+  </header>
+
+  <div id="menu" class="menu hidden">
+    <button id="exportBtn">Export timeline (JSON)</button>
+    <button id="importBtn">Import timeline (JSON)</button>
+    <input type="file" id="importFile" accept="application/json" class="hidden" />
+    <button id="switchFamilyBtn">Switch family</button>
+  </div>
+
+  <nav id="decadeNav" class="decade-nav"></nav>
+
+  <main id="timeline" class="timeline">
+    <div id="loadingState" class="state-msg">Loading your family's timeline&hellip;</div>
+  </main>
+
+  <div id="welcomeBack" class="welcome-back hidden">
+    <span id="welcomeBackText"></span>
+    <button id="welcomeSwitch" class="link-btn">switch family</button>
+  </div>
+
+  <!-- Room-code join overlay -->
+  <div id="joinOverlay" class="overlay hidden">
+    <div class="card join-card">
+      <h2>Enter your family room code</h2>
+      <p class="muted">Each family has its own code. You'll only ever see your own family's history.</p>
+      <input id="roomCodeInput" type="text" placeholder="e.g. naing2026" autocomplete="off" autocapitalize="none" spellcheck="false" />
+      <p id="joinError" class="error hidden">That code didn't match a family &mdash; try again.</p>
+      <button id="joinBtn" class="btn btn-primary btn-block">Join timeline</button>
+    </div>
+  </div>
+
+  <!-- Add entry modal -->
+  <div id="entryModal" class="overlay hidden">
+    <div class="card modal-card">
+      <h2>Add a memory</h2>
+      <form id="entryForm">
+        <label>Title
+          <input id="fTitle" type="text" required maxlength="120" placeholder="e.g. Dad's graduation" />
+        </label>
+        <label>Date
+          <input id="fDate" type="date" />
+        </label>
+        <label>Story
+          <textarea id="fBody" rows="4" placeholder="What happened? Who was there?"></textarea>
+        </label>
+        <label>Your name
+          <input id="fBy" type="text" maxlength="60" placeholder="So family knows who added this" />
+        </label>
+        <fieldset class="uncertain">
+          <legend>Needs confirmation</legend>
+          <label class="check"><input type="checkbox" value="birth_date" /> Birth date</label>
+          <label class="check"><input type="checkbox" value="birthplace" /> Birthplace</label>
+          <label class="check"><input type="checkbox" value="date" /> Date</label>
+        </fieldset>
+        <label>Photos
+          <input id="fPhotos" type="file" accept="image/*" multiple />
+        </label>
+        <p class="muted small">New entries appear right away with a "Not reviewed yet" badge.</p>
+        <div class="modal-actions">
+          <button type="button" id="cancelEntryBtn" class="btn">Cancel</button>
+          <button type="submit" id="saveEntryBtn" class="btn btn-primary">Save</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
