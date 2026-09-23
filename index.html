@@ -49,6 +49,46 @@
       <input id="roomCodeInput" type="text" placeholder="Your family's code" autocomplete="off" autocapitalize="none" spellcheck="false" />
       <p id="joinError" class="error hidden">That code didn't match a family &mdash; try again.</p>
       <button id="joinBtn" class="btn btn-primary btn-block">Join timeline</button>
+      <div class="divider"><span>or</span></div>
+      <button id="createFamilyBtn" class="btn btn-block">Add your family</button>
+    </div>
+  </div>
+
+  <!-- Create family modal -->
+  <div id="createOverlay" class="overlay hidden">
+    <div class="card modal-card">
+      <div id="createStep1">
+        <h2>Add your family</h2>
+        <p class="muted">Start a private timeline just for your family. You'll get a room code to share with them.</p>
+        <label>Family name
+          <input id="newFamilyName" type="text" maxlength="80" placeholder="e.g. The Rivera Family" autocomplete="off" />
+        </label>
+        <p id="createError" class="error hidden"></p>
+        <div class="row">
+          <button id="createBackBtn" class="btn">Back</button>
+          <button id="createGoBtn" class="btn btn-primary">Create family</button>
+        </div>
+      </div>
+      <div id="createStep2" class="hidden">
+        <h2>Your family is ready</h2>
+        <p class="muted">Share the room code with your family so they can join.</p>
+        <div class="secret-box">
+          <span class="secret-label">Room code</span>
+          <div class="secret-row">
+            <code id="newRoomCode"></code>
+            <button id="copyCodeBtn" class="btn btn-small">Copy</button>
+          </div>
+        </div>
+        <div class="secret-box">
+          <span class="secret-label">Owner key</span>
+          <div class="secret-row">
+            <code id="newOwnerSecret" class="secret-truncate"></code>
+            <button id="copySecretBtn" class="btn btn-small">Copy</button>
+          </div>
+        </div>
+        <p class="warning">Save your owner key somewhere safe. It's the only way to approve new entries, and it can't be recovered if lost.</p>
+        <button id="enterTimelineBtn" class="btn btn-primary btn-block">Enter timeline</button>
+      </div>
     </div>
   </div>
 
