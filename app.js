@@ -68,6 +68,18 @@ function makeClient(fid) {
   });
 }
 
+/* Demo family: a permanent example timeline visitors can browse.
+ * In demo mode the add-entry button is hidden so the demo stays clean. */
+const DEMO_FAMILY_ID = "68acff0f-b6ec-4e98-9e1f-e8d1c0661a26";
+const DEMO_FAMILY_NAME = "The Harrison Family";
+let demoMode = false;
+
+function joinDemo() {
+  const fam = { id: DEMO_FAMILY_ID, name: DEMO_FAMILY_NAME };
+  localStorage.setItem(LS_FAMILY, JSON.stringify(fam));
+  enterFamily(fam);
+}
+
 /* ---------------- join flow ---------------- */
 
 async function joinWithCode(code) {
@@ -88,8 +100,11 @@ function enterFamily(fam) {
   familyId = fam.id;
   familyName = fam.name;
   db = makeClient(familyId);
+  demoMode = (fam.id === DEMO_FAMILY_ID);
   document.getElementById("familyName").textContent = familyName;
   document.getElementById("joinOverlay").classList.add("hidden");
+  document.getElementById("demoBanner").classList.toggle("hidden", !demoMode);
+  document.getElementById("addEntryBtn").style.display = demoMode ? "none" : "";
   buildDecadeNav();
   subscribeLive();
   loadTimeline();
@@ -115,6 +130,9 @@ function switchFamily() {
   if (rtChannel) { db.removeChannel(rtChannel); rtChannel = null; }
   localStorage.removeItem(LS_FAMILY);
   familyId = null; db = null;
+  demoMode = false;
+  document.getElementById("addEntryBtn").style.display = "";
+  document.getElementById("demoBanner").classList.add("hidden");
   document.getElementById("timeline").innerHTML = "";
   document.getElementById("decadeNav").innerHTML = "";
   document.getElementById("joinOverlay").classList.remove("hidden");
@@ -535,6 +553,8 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("copySecretBtn").onclick = (e) =>
     copyToClipboard(document.getElementById("newOwnerSecret").textContent, e.target);
   document.getElementById("enterTimelineBtn").onclick = enterCreatedFamily;
+  document.getElementById("demoBtn").onclick = joinDemo;
+  document.getElementById("demoCreateBtn").onclick = openCreate;
 
   if (!silentRejoin()) {
     document.getElementById("joinOverlay").classList.remove("hidden");
