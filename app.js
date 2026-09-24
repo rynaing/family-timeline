@@ -207,15 +207,18 @@ function renderEntry(e, urlMap) {
     html += '<span class="badge badge-pending">Not reviewed yet</span>';
   }
   const dateStr = e.entry_date ? fmtDate(e.entry_date) : "";
-  const hasUncertainDate = (e.uncertain_fields || []).some(f =>
+  // uncertain_fields comes from the jsonb column / imported JSON — coerce to an
+  // array so one malformed entry can't throw mid-render and brick the timeline.
+  const uf = Array.isArray(e.uncertain_fields) ? e.uncertain_fields : [];
+  const hasUncertainDate = uf.some(f =>
     ["birth_date", "birth_year", "date"].includes(f));
   html += '<div class="entry-date">' + esc(dateStr) +
     (dateStr && hasUncertainDate ? ' <span class="asterisk">*</span>' : "") + "</div>";
   html += "<h3>" + esc(e.title) + "</h3>";
   if (e.body) html += '<div class="entry-body">' + esc(e.body) + "</div>";
 
-  if ((e.uncertain_fields || []).length) {
-    const labels = (e.uncertain_fields || []).map(uncertainLabel).join(", ");
+  if (uf.length) {
+    const labels = uf.map(uncertainLabel).join(", ");
     html += '<div class="uncertain-note"><span class="asterisk">*</span> ' +
       esc(labels) + " needs confirmation</div>";
   }
@@ -393,7 +396,7 @@ function importTimeline(file) {
           body: e.body || "",
           entry_date: e.entry_date || null,
           decade: e.decade || null,
-          uncertain_fields: e.uncertain_fields || [],
+          uncertain_fields: Array.isArray(e.uncertain_fields) ? e.uncertain_fields : [],
           created_by: e.created_by || null,
         });
         if (!error) n++;
