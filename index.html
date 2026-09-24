@@ -4,9 +4,68 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Family Timeline</title>
+<meta name="robots" content="noindex, nofollow" />
   <link rel="stylesheet" href="styles.css" />
+<style>
+/* Site gate — performative privacy: blocks casual visitors and scrapers. */
+html.gated body > :not(#gate){display:none !important}
+#gate{position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;background:#14101f;color:#f5f0e8;padding:24px;font-family:system-ui,sans-serif}
+.gate-card{width:100%;max-width:320px;text-align:center;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.14);border-radius:16px;padding:32px 24px}
+.gate-lock{font-size:40px}
+.gate-card h2{margin:8px 0 4px;font-size:20px}
+.gate-card p{opacity:.7;font-size:14px;margin:0 0 16px}
+#gateInput{width:100%;box-sizing:border-box;font-size:24px;letter-spacing:8px;text-indent:8px;text-align:center;padding:10px;border-radius:10px;border:1px solid rgba(255,255,255,.2);background:rgba(0,0,0,.3);color:#fff;margin-bottom:12px}
+#gateBtn{width:100%;padding:12px;border-radius:10px;border:0;font-size:16px;font-weight:700;background:#e8b64c;color:#241d0f;cursor:pointer}
+#gateErr{color:#ff9d9d;opacity:1;margin:12px 0 0}
+</style>
 </head>
 <body>
+<div id="gate">
+  <div class="gate-card">
+    <div class="gate-lock">&#128274;</div>
+    <h2>Private site</h2>
+    <p>Enter the access code to continue.</p>
+    <input id="gateInput" type="password" inputmode="numeric" autocomplete="off" autocapitalize="off" placeholder="&bull;&bull;&bull;&bull;" maxlength="32" />
+    <button id="gateBtn" type="button">Unlock</button>
+    <p id="gateErr" hidden>Wrong code &mdash; try again.</p>
+  </div>
+</div>
+<script>
+(function(){
+  /* Site gate: only the SHA-256 of the access code is stored here, not the code itself. */
+  var GATE_HASH = "3d1e557b540ac045b3b327994a351f08a443f9216f9b2b8d3a0f42b58671ac83";
+  var KEY = "site_gate_v1";
+  document.documentElement.classList.add("gated");
+  function unlock(){
+    document.documentElement.classList.remove("gated");
+    var g = document.getElementById("gate");
+    if (g) g.remove();
+    try { localStorage.setItem(KEY, "1"); } catch(e){}
+  }
+  try { if (localStorage.getItem(KEY) === "1") { unlock(); return; } } catch(e){}
+  function sha(s){
+    return crypto.subtle.digest("SHA-256", new TextEncoder().encode(s)).then(function(b){
+      return Array.prototype.map.call(new Uint8Array(b), function(x){ return ("0"+x.toString(16)).slice(-2); }).join("");
+    });
+  }
+  function bind(){
+    var input = document.getElementById("gateInput");
+    var err = document.getElementById("gateErr");
+    function go(){
+      sha(input.value.trim()).then(function(h){
+        if (h === GATE_HASH) unlock();
+        else { err.hidden = false; input.value = ""; input.focus(); }
+      });
+    }
+    document.getElementById("gateBtn").addEventListener("click", go);
+    input.addEventListener("keydown", function(e){ if (e.key === "Enter") go(); });
+    input.focus();
+  }
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", bind);
+  else bind();
+})();
+</script>
+
   <header class="topbar">
     <div class="brand">
       <span class="brand-mark">&#10022;</span>
