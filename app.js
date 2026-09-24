@@ -83,17 +83,23 @@ function joinDemo() {
 /* ---------------- join flow ---------------- */
 
 async function joinWithCode(code) {
-  code = code.trim();
+  code = code.trim().toLowerCase();
   if (!code) return;
-  const anon = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-  const { data, error } = await anon.rpc("join_family", { code });
-  if (error || !data || !data.length) {
-    document.getElementById("joinError").classList.remove("hidden");
-    return;
+  const joinError = () => document.getElementById("joinError").classList.remove("hidden");
+  try {
+    const anon = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    const { data, error } = await anon.rpc("join_family", { code });
+    if (error || !data || !data.length) {
+      joinError();
+      return;
+    }
+    const fam = { id: data[0].family_id, name: data[0].family_name };
+    localStorage.setItem(LS_FAMILY, JSON.stringify(fam));
+    enterFamily(fam);
+  } catch (e) {
+    console.error(e);
+    toast("Couldn't reach the server \u2014 check your connection.");
   }
-  const fam = { id: data[0].family_id, name: data[0].family_name };
-  localStorage.setItem(LS_FAMILY, JSON.stringify(fam));
-  enterFamily(fam);
 }
 
 function enterFamily(fam) {
@@ -130,7 +136,9 @@ function switchFamily() {
   if (rtChannel) { db.removeChannel(rtChannel); rtChannel = null; }
   localStorage.removeItem(LS_FAMILY);
   familyId = null; db = null;
+  familyName = "";
   demoMode = false;
+  document.getElementById("familyName").textContent = "";
   document.getElementById("addEntryBtn").style.display = "";
   document.getElementById("demoBanner").classList.add("hidden");
   document.getElementById("timeline").innerHTML = "";
@@ -165,6 +173,8 @@ async function loadTimeline() {
     }));
 
     renderTimeline(entries || [], urlMap);
+    // Show a Timeless jump button if any entry has no date.
+    buildDecadeNav((entries || []).some(e => decadeOf(e) === "Timeless"));
   } catch (e) {
     console.error(e);
     main.innerHTML = '<div class="state-msg">Couldn\u2019t load the timeline. Check your connection and try again.</div>';
@@ -245,10 +255,11 @@ function renderEntry(e, urlMap) {
   return card;
 }
 
-function buildDecadeNav() {
+function buildDecadeNav(hasTimeless) {
   const nav = document.getElementById("decadeNav");
   nav.innerHTML = "";
-  DECADES.forEach(dec => {
+  const labels = hasTimeless ? [...DECADES, "Timeless"] : DECADES;
+  labels.forEach(dec => {
     const b = document.createElement("button");
     b.textContent = dec;
     b.onclick = () => {
@@ -299,6 +310,7 @@ async function submitEntry(ev) {
   ev.preventDefault();
   const btn = document.getElementById("saveEntryBtn");
   btn.disabled = true;
+  let entrySaved = false;
   try {
     const title = document.getElementById("fTitle").value.trim();
     const entryDate = document.getElementById("fDate").value || null;
@@ -320,11 +332,16 @@ async function submitEntry(ev) {
     }).select("id");
     if (error) throw error;
     const entryId = rows[0].id;
+    entrySaved = true;
 
-    // Photos → private bucket at <family_id>/<entry_id>/<filename>.
+    // Photos → private bucket at <family_id>/<entry_id>/<unique-name>.
+    // The unique suffix avoids collisions when two files share a basename
+    // (e.g. IMG_001.jpg from different folders), which used to make the
+    // second upload throw *after* the entry was already saved.
     const files = document.getElementById("fPhotos").files;
     for (const file of files) {
-      const path = familyId + "/" + entryId + "/" + file.name;
+      const uniq = Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 8);
+      const path = familyId + "/" + entryId + "/" + uniq + "-" + file.name;
       const { error: upErr } = await db.storage.from("family-photos").upload(path, file);
       if (upErr) throw upErr;
       const { error: phErr } = await db.from("photos").insert({
@@ -342,7 +359,9 @@ async function submitEntry(ev) {
     loadTimeline();
   } catch (e) {
     console.error(e);
-    toast("Couldn\u2019t save that entry. Try again.");
+    toast(entrySaved
+      ? "Entry saved, but a photo failed to upload \u2014 check your connection and try adding it again."
+      : "Couldn\u2019t save that entry. Try again.");
   } finally {
     btn.disabled = false;
   }
@@ -387,7 +406,11 @@ function importTimeline(file) {
   reader.onload = async () => {
     try {
       const payload = JSON.parse(reader.result);
-      const list = payload.entries || [];
+      if (!payload || typeof payload !== "object" || !Array.isArray(payload.entries)) {
+        toast("That file doesn\u2019t look like a timeline export.");
+        return;
+      }
+      const list = payload.entries;
       let n = 0;
       for (const e of list) {
         const { error } = await db.from("entries").insert({
@@ -497,6 +520,18 @@ function initTheme() {
 
 document.addEventListener("DOMContentLoaded", () => {
   initTheme();
+
+  // Signed photo URLs expire after 1 hour. If the tab was hidden for a long
+  // while, refresh the timeline when it comes back so photos re-sign.
+  let hiddenAt = 0;
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) {
+      hiddenAt = Date.now();
+    } else if (hiddenAt && Date.now() - hiddenAt > 45 * 60 * 1000 && familyId) {
+      hiddenAt = 0;
+      loadTimeline();
+    }
+  });
 
   document.getElementById("themeBtn").onclick = () => {
     const cur = document.documentElement.getAttribute("data-theme");
