@@ -12,17 +12,11 @@ const DECADES = ["1930s","1940s","1950s","1960s","1970s","1980s","1990s","2000s"
 const LS_FAMILY = "ft_family";   // { id, name }
 const LS_THEME  = "ft_theme";
 
-const UNCERTAIN_LABELS = {
-  birth_date: "birth date",
-  birth_year: "birth year",
-  birthplace: "birthplace",
-  date: "date",
-};
-
 let familyId = null;
 let familyName = "";
 let db = null;          // supabase client scoped to this family
 let rtChannel = null;   // realtime broadcast channel
+let people = [];        // this family's people (pending + approved)
 
 /* ---------------- helpers ---------------- */
 
@@ -57,7 +51,7 @@ function decadeOf(entry) {
 }
 
 function uncertainLabel(f) {
-  return UNCERTAIN_LABELS[f] || String(f).replace(/_/g, " ");
+  return FT.uncertainLabel(f);
 }
 
 /* One client per family: every request carries the x-family-id header,
@@ -89,6 +83,10 @@ async function joinWithCode(code) {
   try {
     const anon = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
     const { data, error } = await anon.rpc("join_family", { code });
+    if (error && /too many attempts/i.test(error.message || "")) {
+      toast("Too many wrong codes \u2014 wait 15 minutes and try again.");
+      return;
+    }
     if (error || !data || !data.length) {
       joinError();
       return;
@@ -138,6 +136,7 @@ function switchFamily() {
   localStorage.removeItem(LS_FAMILY);
   familyId = null; db = null;
   familyName = "";
+  people = [];
   demoMode = false;
   document.getElementById("familyName").textContent = "";
   document.getElementById("addEntryBtn").style.display = "";
@@ -164,6 +163,17 @@ async function loadTimeline() {
       .order("entry_date", { ascending: true, nullsFirst: true });
     if (error) throw error;
 
+    // People are optional: before the people table exists the query errors,
+    // and the timeline simply shows entries alone.
+    const { data: ppl, error: pErr } = await db
+      .from("people")
+      .select("*")
+      .eq("family_id", familyId)
+      .neq("status", "rejected")
+      .order("name");
+    people = pErr ? [] : (ppl || []);
+    if (pErr) console.warn("people not loaded", pErr);
+
     // Signed URLs for private photo storage (valid 1 hour).
     const allPhotos = [];
     (entries || []).forEach(e => (e.photos || []).forEach(p => allPhotos.push(p)));
@@ -174,25 +184,48 @@ async function loadTimeline() {
       if (data) urlMap[p.id] = data.signedUrl;
     }));
 
-    renderTimeline(entries || [], urlMap);
-    // Show a Timeless jump button if any entry has no date.
-    buildDecadeNav((entries || []).some(e => decadeOf(e) === "Timeless"));
+    const items = timelineItems(entries || []);
+    renderTimeline(items, urlMap);
+    buildDecadeNav(decadesFor(items));
+    renderPeopleList();
   } catch (e) {
     console.error(e);
     main.innerHTML = '<div class="state-msg">Couldn\u2019t load the timeline. Check your connection and try again.</div>';
   }
 }
 
-function renderTimeline(entries, urlMap) {
+/* Entries plus the moments implied by people (born, came to America,
+ * passed away), each with a decade and a sort key. */
+function timelineItems(entries) {
+  const items = entries.map(e => ({
+    kind: "entry", e, decade: decadeOf(e), sortKey: e.entry_date || "",
+  }));
+  people.forEach(p => FT.personMilestones(p).forEach(m => items.push({
+    kind: "milestone", m, decade: FT.decadeOfYear(m.year), sortKey: m.sortKey,
+  })));
+  items.sort((a, b) => a.sortKey < b.sortKey ? -1 : a.sortKey > b.sortKey ? 1 : 0);
+  return items;
+}
+
+/* The fixed 1930s-2020s range, widened to any decade that has something in
+ * it (a 1920s birth used to vanish), plus Timeless when needed. */
+function decadesFor(items) {
+  const set = new Set(DECADES);
+  items.forEach(it => { if (it.decade !== "Timeless") set.add(it.decade); });
+  const list = [...set].sort((a, b) => parseInt(a, 10) - parseInt(b, 10));
+  if (items.some(it => it.decade === "Timeless")) list.push("Timeless");
+  return list;
+}
+
+function renderTimeline(items, urlMap) {
   const main = document.getElementById("timeline");
   main.innerHTML = "";
   const byDecade = {};
-  entries.forEach(e => {
-    const d = decadeOf(e);
-    (byDecade[d] = byDecade[d] || []).push(e);
+  items.forEach(it => {
+    (byDecade[it.decade] = byDecade[it.decade] || []).push(it);
   });
 
-  [...DECADES, ...(byDecade["Timeless"] ? ["Timeless"] : [])].forEach(dec => {
+  decadesFor(items).forEach(dec => {
     const section = document.createElement("section");
     section.className = "decade";
     section.id = "dec-" + dec;
@@ -203,7 +236,8 @@ function renderTimeline(entries, urlMap) {
     if (!list.length) {
       body.innerHTML = '<div class="decade-empty">No memories yet.</div>';
     } else {
-      list.forEach(e => body.appendChild(renderEntry(e, urlMap)));
+      list.forEach(it => body.appendChild(it.kind === "entry"
+        ? renderEntry(it.e, urlMap) : renderMilestone(it.m)));
     }
     section.appendChild(body);
     main.appendChild(section);
@@ -257,10 +291,32 @@ function renderEntry(e, urlMap) {
   return card;
 }
 
-function buildDecadeNav(hasTimeless) {
+function renderMilestone(m) {
+  const card = document.createElement("article");
+  card.className = "entry milestone milestone-" + m.kind;
+  let html = "";
+  if (m.person.status === "pending") {
+    html += '<span class="badge badge-pending">Not reviewed yet</span>';
+  }
+  const dateStr = FT.fmtFlex(m.date, m.year);
+  html += '<div class="entry-date">' + esc(dateStr) +
+    (m.uncertain.some(f => f !== "birthplace") ? ' <span class="asterisk">*</span>' : "") + "</div>";
+  html += "<h3>" + esc(m.title) + "</h3>";
+  const sub = [m.person.relation, m.place].filter(Boolean).join(" \u00b7 ");
+  if (sub) html += '<div class="entry-meta milestone-sub">' + esc(sub) + "</div>";
+  if (m.uncertain.length) {
+    html += '<div class="uncertain-note"><span class="asterisk">*</span> ' +
+      esc(m.uncertain.map(FT.uncertainLabel).join(", ")) + " needs confirmation</div>";
+  }
+  card.innerHTML = html;
+  card.onclick = () => openPeople(m.person.id);
+  return card;
+}
+
+function buildDecadeNav(labels) {
   const nav = document.getElementById("decadeNav");
   nav.innerHTML = "";
-  const labels = hasTimeless ? [...DECADES, "Timeless"] : DECADES;
+  labels = labels || DECADES;
   labels.forEach(dec => {
     const b = document.createElement("button");
     b.textContent = dec;
@@ -369,6 +425,95 @@ async function submitEntry(ev) {
   }
 }
 
+/* ---------------- people ----------------
+ * A person holds the facts the timeline is for (born, came to America,
+ * passed away). New people land as pending, like entries, until the owner
+ * reviews them; their moments show on the timeline straight away. */
+
+function renderPeopleList(highlightId) {
+  const list = document.getElementById("peopleList");
+  if (!list) return;
+  if (!people.length) {
+    list.innerHTML = '<p class="muted">No one added yet. Start with the elders: ' +
+      "when and where they were born, and when they came to America.</p>";
+    return;
+  }
+  list.innerHTML = "";
+  people.forEach(p => {
+    const row = document.createElement("div");
+    row.className = "person-row" + (p.id === highlightId ? " highlight" : "");
+    let html = "";
+    if (p.status === "pending") html += '<span class="badge badge-pending">Not reviewed yet</span>';
+    html += '<div class="person-name">' + esc(p.name) +
+      (p.relation ? ' <span class="muted small">' + esc(p.relation) + "</span>" : "") + "</div>";
+    FT.personFacts(p).forEach(f => { html += '<div class="person-fact">' + esc(f) + "</div>"; });
+    const uf = Array.isArray(p.uncertain_fields) ? p.uncertain_fields : [];
+    if (uf.length) {
+      html += '<div class="uncertain-note"><span class="asterisk">*</span> ' +
+        esc(uf.map(FT.uncertainLabel).join(", ")) + " needs confirmation</div>";
+    }
+    if (p.notes) html += '<div class="entry-body">' + esc(p.notes) + "</div>";
+    if (p.created_by) html += '<div class="entry-meta">' + esc("Added by " + p.created_by) + "</div>";
+    row.innerHTML = html;
+    list.appendChild(row);
+  });
+  if (highlightId) {
+    const el = list.querySelector(".highlight");
+    if (el) el.scrollIntoView({ block: "center" });
+  }
+}
+
+function openPeople(highlightId) {
+  document.getElementById("addPersonBtn").style.display = demoMode ? "none" : "";
+  renderPeopleList(highlightId);
+  document.getElementById("peopleOverlay").classList.remove("hidden");
+}
+function closePeople() {
+  document.getElementById("peopleOverlay").classList.add("hidden");
+}
+
+function openPersonModal() {
+  const form = document.getElementById("personForm");
+  form.reset();
+  document.getElementById("personError").classList.add("hidden");
+  document.getElementById("personModal").classList.remove("hidden");
+  setTimeout(() => document.getElementById("pName").focus(), 60);
+}
+function closePersonModal() {
+  document.getElementById("personModal").classList.add("hidden");
+}
+
+async function submitPerson(ev) {
+  ev.preventDefault();
+  const errEl = document.getElementById("personError");
+  errEl.classList.add("hidden");
+  const form = document.getElementById("personForm");
+  const { row, error: formErr } = FT.readPersonForm("p", form);
+  if (formErr) {
+    errEl.textContent = formErr;
+    errEl.classList.remove("hidden");
+    return;
+  }
+  const btn = document.getElementById("savePersonBtn");
+  btn.disabled = true;
+  try {
+    // Status is forced to 'pending' by the database trigger (review queue).
+    const { error } = await db.from("people").insert({ ...row, family_id: familyId });
+    if (error) throw error;
+    closePersonModal();
+    toast("Added \u2014 it\u2019ll show as \u201cNot reviewed yet\u201d until reviewed.");
+    pingFamily();
+    await loadTimeline();
+    renderPeopleList();
+  } catch (e) {
+    console.error(e);
+    errEl.textContent = "Couldn\u2019t save that person. Try again.";
+    errEl.classList.remove("hidden");
+  } finally {
+    btn.disabled = false;
+  }
+}
+
 /* ---------------- export / import ---------------- */
 
 function exportTimeline() {
@@ -381,6 +526,10 @@ function exportTimeline() {
       const payload = {
         family: familyName,
         exported_at: new Date().toISOString(),
+        people: people.map(p => {
+          const { id, family_id, status, created_at, ...rest } = p;
+          return rest;
+        }),
         entries: (data || []).map(e => ({
           title: e.title,
           body: e.body,
@@ -427,7 +576,26 @@ function importTimeline(file) {
         });
         if (!error) n++;
       }
-      toast("Imported " + n + " of " + list.length + " entries (pending review). Photos need re-uploading.");
+      const plist = Array.isArray(payload.people) ? payload.people : [];
+      let pn = 0;
+      for (const p of plist) {
+        if (!p || !p.name) continue;
+        const pick = k => (p[k] === undefined ? null : p[k]);
+        const { error } = await db.from("people").insert({
+          family_id: familyId,
+          name: String(p.name),
+          relation: pick("relation"),
+          birth_date: pick("birth_date"), birth_year: pick("birth_year"), birthplace: pick("birthplace"),
+          arrival_date: pick("arrival_date"), arrival_year: pick("arrival_year"), arrival_place: pick("arrival_place"),
+          death_date: pick("death_date"), death_year: pick("death_year"),
+          notes: pick("notes"), created_by: pick("created_by"),
+          uncertain_fields: Array.isArray(p.uncertain_fields) ? p.uncertain_fields : [],
+        });
+        if (!error) pn++;
+      }
+      toast("Imported " + n + " of " + list.length + " entries" +
+        (plist.length ? " and " + pn + " of " + plist.length + " people" : "") +
+        " (pending review). Photos need re-uploading.");
       pingFamily();
       loadTimeline();
     } catch (e) {
@@ -597,6 +765,19 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("enterTimelineBtn").onclick = enterCreatedFamily;
   document.getElementById("demoBtn").onclick = joinDemo;
   document.getElementById("demoCreateBtn").onclick = openCreate;
+
+  document.getElementById("personFields").innerHTML = FT.personFormHTML("p");
+  document.getElementById("peopleBtn").onclick = () => { menu.classList.add("hidden"); openPeople(); };
+  document.getElementById("closePeopleBtn").onclick = closePeople;
+  document.getElementById("peopleOverlay").addEventListener("click", (e) => {
+    if (e.target.id === "peopleOverlay") closePeople();
+  });
+  document.getElementById("addPersonBtn").onclick = openPersonModal;
+  document.getElementById("cancelPersonBtn").onclick = closePersonModal;
+  document.getElementById("personForm").onsubmit = submitPerson;
+  document.getElementById("personModal").addEventListener("click", (e) => {
+    if (e.target.id === "personModal") closePersonModal();
+  });
 
   if (!silentRejoin()) {
     document.getElementById("joinOverlay").classList.remove("hidden");

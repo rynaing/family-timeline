@@ -17,8 +17,14 @@ devices, photo uploads to private storage.
 - Export timeline to JSON / import entries from JSON
 - Privacy (eye) mode hides stories and photos for shoulder-surfers
 - `*` marks fields that still need confirmation
+- **People** (menu → People): name, relation, born, birthplace, came to
+  America, passed away. Any date can be just a year. Each person's moments
+  show on the timeline, and the decade range widens to fit (a 1920s birth
+  gets a 1920s column)
 - Owner review page (`review.html`, also under the menu as **Review new entries**):
-  sign in with the room code and owner key, then approve or reject pending entries
+  sign in with the room code and owner key, then approve or reject pending
+  entries and people; the **Edit & confirm** tab fixes mistakes, clears
+  "needs confirmation" marks, and restores rejected items
 
 ## Security notes
 
@@ -30,6 +36,31 @@ devices, photo uploads to private storage.
   it in the tab's session storage only (closing the tab forgets it).
 - Approve sets an entry's status to `approved`. Reject sets it to `rejected`,
   which hides it from the timeline and export but keeps the row and photos.
+
+## Database upgrade (one time, 2026-10-04)
+
+Run [`supabase/2026-10-04-upgrade.sql`](supabase/2026-10-04-upgrade.sql) in
+the Supabase SQL editor. It limits wrong room-code guesses (10 per IP per 15
+minutes), takes `reset_leaderboard` off the public API, deletes the empty
+"chan" test family, adds the `people` table, and gives the Naing family a
+new random room code, printed at the end. Devices that already joined keep
+working; share the new code for new joins. Until it runs, the site works as
+before, just without people.
+
+## Backups
+
+`.github/workflows/backup.yml` runs every Sunday (or on demand from the
+Actions tab). It downloads the family's entries, people and photos,
+encrypts them with a passphrase, and keeps each backup as a workflow
+artifact for 90 days. Turn it on by adding two repository secrets under
+**Settings → Secrets and variables → Actions**:
+
+- `FAMILY_ID`: the family's id (it is the family's read key, so keep it secret)
+- `BACKUP_PASSPHRASE`: a long passphrase; store it somewhere safe, since the
+  backup can't be opened without it
+
+To open a backup: download the artifact, unzip it, then
+`gpg -d family-backup-YYYY-MM-DD.tar.gz.gpg | tar xz`.
 
 ## Deploy to GitHub Pages
 
@@ -51,3 +82,6 @@ devices, photo uploads to private storage.
 - [ ] Export downloads JSON; import adds entries as pending
 - [ ] Review page: wrong owner key is refused; approve clears the badge on
       the timeline; reject hides the entry everywhere
+- [ ] People: add one with a year-only birth; it appears on the timeline and
+      in the review queue; editing it there updates the timeline
+- [ ] Eleven wrong room codes in a row get "too many wrong codes"

@@ -23,6 +23,11 @@
       background: var(--bg); color: var(--ink); font-size: 0.95rem; margin-top: 0.25rem;
     }
     a.btn { text-decoration: none; display: inline-flex; align-items: center; }
+    .tabs { display: flex; gap: 0.4rem; margin-bottom: 1rem; }
+    .tab { border: 1px solid var(--line); background: var(--surface); color: var(--muted); border-radius: 999px; padding: 0.4rem 0.9rem; font-size: 0.88rem; cursor: pointer; }
+    .tab.active { background: var(--coral); border-color: var(--coral); color: #fff; font-weight: 600; }
+    .review-subhead { margin: 1.25rem 0 0; font-size: 0.95rem; color: var(--muted); }
+    .review-actions .btn:only-child { flex: 0 1 auto; }
   </style>
 </head>
 <body>
@@ -59,6 +64,10 @@
     </div>
 
     <section id="reviewPanel" class="hidden">
+      <div class="tabs">
+        <button class="tab active" data-tab="new">New<span id="newCount"></span></button>
+        <button class="tab" data-tab="edit">Edit &amp; confirm</button>
+      </div>
       <div class="review-head">
         <h2 id="pendingCount"></h2>
         <button id="approveAllBtn" class="btn btn-small hidden">Approve all</button>
@@ -67,9 +76,36 @@
     </section>
   </main>
 
+  <div id="editModal" class="overlay hidden">
+    <div class="card modal-card">
+      <h2 id="editTitle">Edit</h2>
+      <form id="editForm" novalidate>
+        <div id="editEntryFields">
+          <label>Title<input id="eTitle" type="text" maxlength="120" /></label>
+          <label>Date<input id="eDate" type="date" /></label>
+          <label>Story<textarea id="eBody" rows="4"></textarea></label>
+          <label>Added by<input id="eBy" type="text" maxlength="60" /></label>
+          <fieldset class="uncertain">
+            <legend>Needs confirmation</legend>
+            <label class="check"><input type="checkbox" value="birth_date" /> Birth date</label>
+            <label class="check"><input type="checkbox" value="birthplace" /> Birthplace</label>
+            <label class="check"><input type="checkbox" value="date" /> Date</label>
+          </fieldset>
+        </div>
+        <div id="editPersonFields" class="hidden"></div>
+        <p id="editError" class="error hidden"></p>
+        <div class="modal-actions">
+          <button type="button" id="cancelEditBtn" class="btn">Cancel</button>
+          <button type="submit" id="saveEditBtn" class="btn btn-primary">Save</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <div id="toast" class="toast hidden"></div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="shared.js"></script>
   <script src="review.js"></script>
 </body>
 </html>

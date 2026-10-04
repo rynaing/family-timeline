@@ -15,19 +15,13 @@ const LS_THEME  = "ft_theme";
 const SS_OWNER  = "ft_owner_key";
 const DEMO_FAMILY_ID = "68acff0f-b6ec-4e98-9e1f-e8d1c0661a26";
 
-const UNCERTAIN_LABELS = {
-  birth_date: "birth date",
-  birth_year: "birth year",
-  birthplace: "birthplace",
-  date: "date",
-};
-
 let family = null;      // { id, name }
 let ownerKey = "";
 let db = null;          // client carrying x-family-id + x-owner-secret
 let rtChannel = null;
 let pending = [];
 let urlMap = {};     // photo id -> signed URL
+
 
 /* ---------------- helpers ---------------- */
 
@@ -176,7 +170,7 @@ function enterReview() {
   document.getElementById("signOutBtn").classList.remove("hidden");
   document.getElementById("familyName").textContent = family.name;
   subscribeLive();
-  loadPending();
+  loadAll();
 }
 
 /* ---------------- live sync ----------------
@@ -192,7 +186,7 @@ function subscribeLive() {
   });
   rtChannel.on("broadcast", { event: "refresh" }, () => {
     clearTimeout(refreshTimer);
-    refreshTimer = setTimeout(loadPending, 600);
+    refreshTimer = setTimeout(loadAll, 600);
   });
   rtChannel.subscribe();
 }
@@ -201,107 +195,181 @@ function pingFamily() {
   if (rtChannel) rtChannel.send({ type: "broadcast", event: "refresh", payload: {} });
 }
 
-/* ---------------- list ---------------- */
+/* ---------------- data ----------------
+ * Everything for the family is loaded at once: the New tab shows what's
+ * pending, the Edit tab shows the rest so the owner can correct entries and
+ * clear "needs confirmation" marks once a fact has been checked. */
 
-async function loadPending() {
+let tab = "new";
+let entries = [];       // all entries, any status
+let peopleRows = [];    // all people, any status (empty until the table exists)
+
+async function loadAll() {
   const list = document.getElementById("reviewList");
-  if (!pending.length) list.innerHTML = '<div class="state-msg">Loading new entries&hellip;</div>';
+  if (!entries.length && !peopleRows.length) {
+    list.innerHTML = '<div class="state-msg">Loading&hellip;</div>';
+  }
   const { data, error } = await db.from("entries")
     .select("*, photos(*)")
     .eq("family_id", family.id)
-    .eq("status", "pending")
     .order("entry_date", { ascending: true, nullsFirst: true });
   if (error) {
     console.error(error);
     list.innerHTML = '<div class="state-msg">' + esc(errorText(error)) + "</div>";
     return;
   }
-  pending = Array.isArray(data) ? data : [];
+  entries = Array.isArray(data) ? data : [];
+  const { data: ppl, error: pErr } = await db.from("people")
+    .select("*").eq("family_id", family.id).order("name");
+  peopleRows = pErr ? [] : (ppl || []);
+  if (pErr) console.warn("people not loaded", pErr);
 
-  // Signed URLs for private photo storage (valid 1 hour).
+  // Signed URLs for private photo storage (valid 1 hour), pending only.
   urlMap = {};
-  await Promise.all(pending.flatMap(e => (e.photos || []).map(async p => {
-    const { data: s } = await db.storage.from("family-photos").createSignedUrl(p.storage_path, 3600);
-    if (s) urlMap[p.id] = s.signedUrl;
-  })));
+  await Promise.all(entries.filter(e => e.status === "pending")
+    .flatMap(e => (e.photos || []).map(async p => {
+      const { data: s } = await db.storage.from("family-photos").createSignedUrl(p.storage_path, 3600);
+      if (s) urlMap[p.id] = s.signedUrl;
+    })));
+  render();
+}
+
+/* Items in one shape: { table, row, title, dateStr, sortKey }. */
+function asItems() {
+  const items = entries.map(e => ({
+    table: "entries", row: e, title: e.title,
+    dateStr: e.entry_date ? fmtDate(e.entry_date) : (e.decade || "No date"),
+    sortKey: e.entry_date || "",
+  }));
+  peopleRows.forEach(p => items.push({
+    table: "people", row: p, title: p.name,
+    dateStr: "Person" + (p.relation ? " · " + p.relation : ""),
+    sortKey: p.birth_date || (p.birth_year ? p.birth_year + "-00-00" : ""),
+  }));
+  items.sort((a, b) => a.sortKey < b.sortKey ? -1 : a.sortKey > b.sortKey ? 1 : 0);
+  return items;
+}
+
+/* ---------------- render ---------------- */
+
+function setTab(t) {
+  tab = t;
+  document.querySelectorAll(".tab").forEach(b => b.classList.toggle("active", b.dataset.tab === t));
   render();
 }
 
 function render() {
   const list = document.getElementById("reviewList");
-  const n = pending.length;
-  document.getElementById("pendingCount").textContent =
-    n ? n + (n === 1 ? " entry" : " entries") + " waiting for review" : "All caught up";
-  document.getElementById("approveAllBtn").classList.toggle("hidden", n < 2);
+  const items = asItems();
+  const pendingItems = items.filter(it => it.row.status === "pending");
+  pending = pendingItems;
+  const n = pendingItems.length;
+  document.getElementById("newCount").textContent = n ? " (" + n + ")" : "";
   list.innerHTML = "";
-  if (!n) {
-    list.innerHTML = '<div class="state-msg">Nothing new to review. New entries from family will show up here.</div>';
+
+  if (tab === "new") {
+    document.getElementById("pendingCount").textContent =
+      n ? n + (n === 1 ? " item" : " items") + " waiting for review" : "All caught up";
+    document.getElementById("approveAllBtn").classList.toggle("hidden", n < 2);
+    if (!n) {
+      list.innerHTML = '<div class="state-msg">Nothing new to review. New entries and people from family will show up here.</div>';
+      return;
+    }
+    pendingItems.forEach(it => list.appendChild(renderCard(it, "review")));
     return;
   }
-  pending.forEach(e => list.appendChild(renderEntry(e)));
+
+  document.getElementById("approveAllBtn").classList.add("hidden");
+  const active = items.filter(it => it.row.status !== "rejected");
+  const rejected = items.filter(it => it.row.status === "rejected");
+  const unsure = active.filter(it => ufOf(it.row).length).length;
+  document.getElementById("pendingCount").textContent =
+    unsure ? unsure + " still need confirmation" : "Everything confirmed";
+  if (!active.length) list.innerHTML = '<div class="state-msg">Nothing here yet.</div>';
+  active.forEach(it => list.appendChild(renderCard(it, "edit")));
+  if (rejected.length) {
+    const h = document.createElement("h3");
+    h.className = "review-subhead";
+    h.textContent = "Rejected";
+    list.appendChild(h);
+    rejected.forEach(it => list.appendChild(renderCard(it, "rejected")));
+  }
 }
 
-function renderEntry(e) {
-  const card = document.createElement("article");
-  card.className = "entry";
-  card.dataset.id = e.id;
+const ufOf = row => (Array.isArray(row.uncertain_fields) ? row.uncertain_fields : []);
 
+function renderCard(it, mode) {
+  const e = it.row;
+  const card = document.createElement("article");
+  card.className = "entry" + (it.table === "people" ? " milestone" : "");
   let html = "";
-  const uf = Array.isArray(e.uncertain_fields) ? e.uncertain_fields : [];
-  const dateStr = e.entry_date ? fmtDate(e.entry_date) : (e.decade || "No date");
-  html += '<div class="entry-date">' + esc(dateStr) + "</div>";
-  html += "<h3>" + esc(e.title) + "</h3>";
-  if (e.body) html += '<div class="entry-body">' + esc(e.body) + "</div>";
-  if (uf.length) {
-    const labels = uf.map(f => UNCERTAIN_LABELS[f] || String(f).replace(/_/g, " ")).join(", ");
-    html += '<div class="uncertain-note"><span class="asterisk">*</span> ' +
-      esc(labels) + " needs confirmation</div>";
+  if (mode === "edit" && e.status === "pending") html += '<span class="badge badge-pending">Not reviewed yet</span>';
+  html += '<div class="entry-date">' + esc(it.dateStr) + "</div>";
+  html += "<h3>" + esc(it.title) + "</h3>";
+  if (it.table === "people") {
+    FT.personFacts(e).forEach(f => { html += '<div class="person-fact">' + esc(f) + "</div>"; });
+    if (e.notes) html += '<div class="entry-body">' + esc(e.notes) + "</div>";
+  } else if (e.body) {
+    html += '<div class="entry-body">' + esc(e.body) + "</div>";
   }
-  const photos = e.photos || [];
-  if (photos.length) {
-    html += '<div class="entry-photos">';
-    photos.forEach(p => {
-      const url = urlMap[p.id];
-      if (url) html += '<img src="' + esc(url) + '" alt="' + esc(p.caption || e.title) + '" loading="lazy" />';
-    });
-    html += "</div>";
+  const uf = ufOf(e);
+  if (uf.length) {
+    html += '<div class="uncertain-note"><span class="asterisk">*</span> ' +
+      esc(uf.map(FT.uncertainLabel).join(", ")) + " needs confirmation</div>";
+  }
+  if (mode === "review" && it.table === "entries") {
+    const imgs = (e.photos || []).map(p => urlMap[p.id]
+      ? '<img src="' + esc(urlMap[p.id]) + '" alt="' + esc(p.caption || e.title) + '" loading="lazy" />' : "").join("");
+    if (imgs) html += '<div class="entry-photos">' + imgs + "</div>";
   }
   if (e.created_by) html += '<div class="entry-meta">' + esc("Added by " + e.created_by) + "</div>";
-  html += '<div class="review-actions">' +
-    '<button class="btn btn-reject" data-act="reject">Reject</button>' +
-    '<button class="btn btn-primary" data-act="approve">Approve</button></div>';
 
+  html += '<div class="review-actions">';
+  if (mode === "review") {
+    html += '<button class="btn btn-reject" data-act="reject">Reject</button>' +
+            '<button class="btn btn-primary" data-act="approve">Approve</button>';
+  } else if (mode === "edit") {
+    html += '<button class="btn" data-act="edit">Edit</button>';
+    if (uf.length) html += '<button class="btn btn-primary" data-act="confirm">Mark confirmed</button>';
+  } else {
+    html += '<button class="btn" data-act="restore">Restore</button>';
+  }
+  html += "</div>";
   card.innerHTML = html;
-  card.querySelector('[data-act="approve"]').onclick = () => review(e, true, card);
-  card.querySelector('[data-act="reject"]').onclick = () => review(e, false, card);
+
+  const on = (act, fn) => { const b = card.querySelector('[data-act="' + act + '"]'); if (b) b.onclick = fn; };
+  on("approve", () => act(it, card, { status: "approved" }, "Approved."));
+  on("reject", () => {
+    if (confirm("Reject “" + (it.title || "this") + "”? It will be hidden from the timeline for everyone. You can restore it from the Edit tab.")) {
+      act(it, card, { status: "rejected" }, "Rejected.");
+    }
+  });
+  on("confirm", () => act(it, card, { uncertain_fields: [] }, "Marked confirmed."));
+  on("restore", () => act(it, card, { status: "pending" }, "Restored to the review queue."));
+  on("edit", () => openEdit(it));
   return card;
 }
 
-/* ---------------- approve / reject ---------------- */
+/* ---------------- writes ----------------
+ * The owner update policy returns the row only when the owner key matches,
+ * so an empty result means the key stopped working. */
 
-async function reviewOne(entry, approve) {
-  // Rejected entries are kept with status 'rejected' (hidden from the
-  // timeline) rather than deleted, so a mistaken reject can be undone.
-  const { data, error } = await db.from("entries")
-    .update({ status: approve ? "approved" : "rejected" })
-    .eq("id", entry.id).eq("family_id", family.id)
-    .select("id");
+async function updateRow(table, id, patch) {
+  const { data, error } = await db.from(table)
+    .update(patch).eq("id", id).eq("family_id", family.id).select("*");
   if (error) throw error;
   if (!data || !data.length) throw new Error(BAD_KEY);
+  return data[0];
 }
 
-async function review(entry, approve, card) {
-  if (!approve && !confirm("Reject “" + (entry.title || "this entry") +
-      "”? It will be hidden from the timeline for everyone.")) {
-    return;
-  }
+async function act(it, card, patch, msg) {
   card.querySelectorAll("button").forEach(b => { b.disabled = true; });
   try {
-    await reviewOne(entry, approve);
-    pending = pending.filter(e => e.id !== entry.id);
+    const row = await updateRow(it.table, it.row.id, patch);
+    Object.assign(it.row, row);
     render();
     pingFamily();
-    toast(approve ? "Approved." : "Rejected.");
+    toast(msg);
   } catch (e) {
     console.error(e);
     card.querySelectorAll("button").forEach(b => { b.disabled = false; });
@@ -312,17 +380,91 @@ async function review(entry, approve, card) {
 async function approveAll() {
   const list = pending.slice();
   if (!list.length) return;
-  if (!confirm("Approve all " + list.length + " entries?")) return;
+  if (!confirm("Approve all " + list.length + " items?")) return;
   const btn = document.getElementById("approveAllBtn");
   btn.disabled = true;
   let n = 0;
-  for (const e of list) {
-    try { await reviewOne(e, true); n++; } catch (err) { console.error(err); }
+  for (const it of list) {
+    try { await updateRow(it.table, it.row.id, { status: "approved" }); n++; } catch (err) { console.error(err); }
   }
   btn.disabled = false;
   pingFamily();
-  toast(n === list.length ? "Approved " + n + " entries." : "Approved " + n + " of " + list.length + " entries.");
-  loadPending();
+  toast(n === list.length ? "Approved " + n + " items." : "Approved " + n + " of " + list.length + " items.");
+  loadAll();
+}
+
+/* ---------------- edit modal ---------------- */
+
+let editing = null;
+
+function openEdit(it) {
+  editing = it;
+  const isPerson = it.table === "people";
+  document.getElementById("editTitle").textContent = isPerson ? "Edit person" : "Edit entry";
+  document.getElementById("editEntryFields").classList.toggle("hidden", isPerson);
+  document.getElementById("editPersonFields").classList.toggle("hidden", !isPerson);
+  document.getElementById("editError").classList.add("hidden");
+  const form = document.getElementById("editForm");
+  if (isPerson) {
+    FT.fillPersonForm("e", document.getElementById("editPersonFields"), it.row);
+  } else {
+    const e = it.row;
+    document.getElementById("eTitle").value = e.title || "";
+    document.getElementById("eDate").value = e.entry_date || "";
+    document.getElementById("eBody").value = e.body || "";
+    document.getElementById("eBy").value = e.created_by || "";
+    const uf = ufOf(e);
+    document.querySelectorAll("#editEntryFields .uncertain input").forEach(c => { c.checked = uf.includes(c.value); });
+  }
+  document.getElementById("editModal").classList.remove("hidden");
+  form.querySelector("input").focus();
+}
+
+function closeEdit() {
+  editing = null;
+  document.getElementById("editModal").classList.add("hidden");
+}
+
+async function saveEdit(ev) {
+  ev.preventDefault();
+  if (!editing) return;
+  const errEl = document.getElementById("editError");
+  const fail = msg => { errEl.textContent = msg; errEl.classList.remove("hidden"); };
+  errEl.classList.add("hidden");
+  let patch;
+  if (editing.table === "people") {
+    const { row, error } = FT.readPersonForm("e", document.getElementById("editPersonFields"));
+    if (error) return fail(error);
+    patch = row;
+  } else {
+    const title = document.getElementById("eTitle").value.trim();
+    if (!title) return fail("Give the entry a title.");
+    const entryDate = document.getElementById("eDate").value || null;
+    patch = {
+      title,
+      entry_date: entryDate,
+      body: document.getElementById("eBody").value.trim(),
+      created_by: document.getElementById("eBy").value.trim() || null,
+      uncertain_fields: [...document.querySelectorAll("#editEntryFields .uncertain input:checked")].map(c => c.value),
+    };
+    // Keep the decade in step with the date; an undated entry keeps its decade.
+    if (entryDate) patch.decade = Math.floor(parseInt(entryDate.slice(0, 4), 10) / 10) * 10 + "s";
+  }
+  const btn = document.getElementById("saveEditBtn");
+  btn.disabled = true;
+  try {
+    const row = await updateRow(editing.table, editing.row.id, patch);
+    Object.assign(editing.row, row);
+    closeEdit();
+    render();
+    pingFamily();
+    toast("Saved.");
+  } catch (e) {
+    console.error(e);
+    fail(errorText(e));
+  } finally {
+    btn.disabled = false;
+  }
 }
 
 /* ---------------- init ---------------- */
@@ -343,12 +485,17 @@ document.addEventListener("DOMContentLoaded", () => {
     document.getElementById(id).addEventListener("keydown", e => { if (e.key === "Enter") signIn(); }));
   document.getElementById("signOutBtn").onclick = signOut;
   document.getElementById("approveAllBtn").onclick = approveAll;
+  document.querySelectorAll(".tab").forEach(b => { b.onclick = () => setTab(b.dataset.tab); });
+  document.getElementById("editPersonFields").innerHTML = FT.personFormHTML("e");
+  document.getElementById("editForm").onsubmit = saveEdit;
+  document.getElementById("cancelEditBtn").onclick = closeEdit;
+  document.getElementById("editModal").addEventListener("click", e => { if (e.target.id === "editModal") closeEdit(); });
 
   // Re-sign photo URLs if the tab sat hidden past their 1-hour lifetime.
   let hiddenAt = 0;
   document.addEventListener("visibilitychange", () => {
     if (document.hidden) hiddenAt = Date.now();
-    else if (hiddenAt && Date.now() - hiddenAt > 45 * 60 * 1000 && ownerKey) { hiddenAt = 0; loadPending(); }
+    else if (hiddenAt && Date.now() - hiddenAt > 45 * 60 * 1000 && ownerKey) { hiddenAt = 0; loadAll(); }
   });
 
   try {
