@@ -1,9 +1,10 @@
 /* Family Timeline — owner review page.
  *
  * The owner signs in with the family room code and the owner key they saved
- * when the family was created. Approve / reject go through SECURITY DEFINER
- * functions (sql/owner_review.sql) that check the owner key on every call,
- * so the publishable key below still can't change review status by itself.
+ * when the family was created. Requests then carry the x-owner-secret header
+ * next to x-family-id; the database's is_family_owner() row-level policies
+ * only allow updating a family's entries when that header matches, so the
+ * publishable key below still can't change review status by itself.
  * The owner key is kept in sessionStorage only: closing the tab forgets it.
  */
 const SUPABASE_URL = "https://ukrxoqsvyvlyeblubjeo.supabase.co";
@@ -23,7 +24,7 @@ const UNCERTAIN_LABELS = {
 
 let family = null;      // { id, name }
 let ownerKey = "";
-let db = null;          // client carrying x-family-id, for photos + live pings
+let db = null;          // client carrying x-family-id + x-owner-secret
 let rtChannel = null;
 let pending = [];
 let urlMap = {};     // photo id -> signed URL
@@ -58,20 +59,34 @@ function storedFamily() {
   } catch { return null; }
 }
 
-/* PGRST202 / 404 = the function isn't in the database yet. */
-function isMissingFn(error) {
-  return error && (error.code === "PGRST202" || error.code === "42883" ||
-    /could not find the function/i.test(error.message || ""));
-}
+const BAD_KEY = "invalid owner key";
 
-function rpcErrorText(error) {
-  if (isMissingFn(error)) {
-    return "Review isn’t set up in the database yet — run sql/owner_review.sql in the Supabase SQL editor.";
-  }
-  if (error && /invalid owner key/i.test(error.message || "")) {
+function errorText(error) {
+  if (error && error.message === BAD_KEY) {
     return "That owner key doesn’t match this family.";
   }
   return "Something went wrong — check your connection and try again.";
+}
+
+function makeClient(fid, key) {
+  return window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+    global: { headers: { "x-family-id": fid, "x-owner-secret": key } },
+  });
+}
+
+/* There's no read that only the owner can do, so check the key with a no-op
+ * update: set one entry's status to the value it already has. The owner
+ * update policy returns the row only when the key matches. A family with no
+ * entries has nothing to review yet, so the key is accepted as-is. */
+async function verifyOwner(client, fid) {
+  const { data: rows, error } = await client.from("entries")
+    .select("id, status").eq("family_id", fid).limit(1);
+  if (error) throw error;
+  if (!rows || !rows.length) return true;
+  const { data: upd, error: uerr } = await client.from("entries")
+    .update({ status: rows[0].status }).eq("id", rows[0].id).select("id");
+  if (uerr) throw uerr;
+  return !!(upd && upd.length);
 }
 
 function signinError(msg) {
@@ -129,9 +144,11 @@ async function signIn() {
       fam = { id: data[0].family_id, name: data[0].family_name };
     }
     if (!key) { signinError("Enter the owner key."); return; }
-    const { data: ok, error } = await anon.rpc("owner_check", { fid: fam.id, secret: key });
-    if (error) { signinError(rpcErrorText(error)); return; }
-    if (!ok) { signinError("That owner key doesn’t match this family."); return; }
+    if (fam.id === DEMO_FAMILY_ID) { signinError("The demo family can’t be reviewed."); return; }
+    if (!(await verifyOwner(makeClient(fam.id, key), fam.id))) {
+      signinError("That owner key doesn’t match this family.");
+      return;
+    }
     family = fam;
     ownerKey = key;
     try { sessionStorage.setItem(SS_OWNER, JSON.stringify({ id: fam.id, name: fam.name, key })); } catch {}
@@ -153,9 +170,7 @@ function signOut() {
 }
 
 function enterReview() {
-  db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
-    global: { headers: { "x-family-id": family.id } },
-  });
+  db = makeClient(family.id, ownerKey);
   document.getElementById("signin").classList.add("hidden");
   document.getElementById("reviewPanel").classList.remove("hidden");
   document.getElementById("signOutBtn").classList.remove("hidden");
@@ -191,16 +206,14 @@ function pingFamily() {
 async function loadPending() {
   const list = document.getElementById("reviewList");
   if (!pending.length) list.innerHTML = '<div class="state-msg">Loading new entries&hellip;</div>';
-  const { data, error } = await window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY)
-    .rpc("owner_pending_entries", { fid: family.id, secret: ownerKey });
+  const { data, error } = await db.from("entries")
+    .select("*, photos(*)")
+    .eq("family_id", family.id)
+    .eq("status", "pending")
+    .order("entry_date", { ascending: true, nullsFirst: true });
   if (error) {
     console.error(error);
-    if (/invalid owner key/i.test(error.message || "")) {
-      signOut();
-      signinError("That owner key no longer matches this family.");
-      return;
-    }
-    list.innerHTML = '<div class="state-msg">' + esc(rpcErrorText(error)) + "</div>";
+    list.innerHTML = '<div class="state-msg">' + esc(errorText(error)) + "</div>";
     return;
   }
   pending = Array.isArray(data) ? data : [];
@@ -267,22 +280,19 @@ function renderEntry(e) {
 /* ---------------- approve / reject ---------------- */
 
 async function reviewOne(entry, approve) {
-  const anon = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-  const { data, error } = await anon.rpc("owner_review_entry",
-    { fid: family.id, secret: ownerKey, eid: entry.id, approve });
+  // Rejected entries are kept with status 'rejected' (hidden from the
+  // timeline) rather than deleted, so a mistaken reject can be undone.
+  const { data, error } = await db.from("entries")
+    .update({ status: approve ? "approved" : "rejected" })
+    .eq("id", entry.id).eq("family_id", family.id)
+    .select("id");
   if (error) throw error;
-  // Rejected: the rows are gone; remove the photo files too. Best effort —
-  // a leftover file in the private bucket is harmless.
-  const paths = (data && Array.isArray(data.storage_paths)) ? data.storage_paths : [];
-  if (paths.length) {
-    const { error: rmErr } = await db.storage.from("family-photos").remove(paths);
-    if (rmErr) console.warn("photo cleanup failed", rmErr);
-  }
+  if (!data || !data.length) throw new Error(BAD_KEY);
 }
 
 async function review(entry, approve, card) {
   if (!approve && !confirm("Reject “" + (entry.title || "this entry") +
-      "”? It will be deleted for everyone, with its photos. This can’t be undone.")) {
+      "”? It will be hidden from the timeline for everyone.")) {
     return;
   }
   card.querySelectorAll("button").forEach(b => { b.disabled = true; });
@@ -291,11 +301,11 @@ async function review(entry, approve, card) {
     pending = pending.filter(e => e.id !== entry.id);
     render();
     pingFamily();
-    toast(approve ? "Approved." : "Rejected and deleted.");
+    toast(approve ? "Approved." : "Rejected.");
   } catch (e) {
     console.error(e);
     card.querySelectorAll("button").forEach(b => { b.disabled = false; });
-    toast(rpcErrorText(e));
+    toast(errorText(e));
   }
 }
 

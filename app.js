@@ -160,6 +160,7 @@ async function loadTimeline() {
       .from("entries")
       .select("*, photos(*)")
       .eq("family_id", familyId)
+      .neq("status", "rejected")
       .order("entry_date", { ascending: true, nullsFirst: true });
     if (error) throw error;
 
@@ -373,6 +374,7 @@ async function submitEntry(ev) {
 function exportTimeline() {
   db.from("entries").select("*, photos(*)")
     .eq("family_id", familyId)
+    .neq("status", "rejected")
     .order("entry_date", { ascending: true, nullsFirst: true })
     .then(({ data, error }) => {
       if (error) throw error;
