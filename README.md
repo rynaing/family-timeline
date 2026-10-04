@@ -17,13 +17,25 @@ devices, photo uploads to private storage.
 - Export timeline to JSON / import entries from JSON
 - Privacy (eye) mode hides stories and photos for shoulder-surfers
 - `*` marks fields that still need confirmation
+- Owner review page (`review.html`, also under the menu as **Review new entries**):
+  sign in with the room code and owner key, then approve or reject pending entries
 
 ## Security notes
 
 - `app.js` contains the Supabase URL and the **publishable** key. This is
   public by design — it can only do what row-level security allows.
-- The **owner secret** is never in this repo. Admin approve/reject lives on
-  a separate private page (not yet built).
+- The **owner secret** is never in this repo. The review page sends it to
+  the `owner_*` database functions, which check it on every call, and keeps
+  it in the tab's session storage only (closing the tab forgets it).
+
+## Owner review setup (one time)
+
+Run [`sql/owner_review.sql`](sql/owner_review.sql) in the Supabase SQL editor
+(Dashboard → SQL Editor → New query → paste → Run). It adds `owner_check`,
+`owner_pending_entries` and `owner_review_entry`. It finds the owner-key
+column on `families` by itself and prints which one it used; if it can't
+find one it stops with a message instead of guessing. Approve sets an
+entry's status to `approved`; reject deletes the entry and its photos.
 
 ## Deploy to GitHub Pages
 
@@ -43,3 +55,5 @@ devices, photo uploads to private storage.
 - [ ] Wrong code shows an error; switching family clears the session
 - [ ] Privacy eye mode hides stories/photos; dark mode persists
 - [ ] Export downloads JSON; import adds entries as pending
+- [ ] Review page: wrong owner key is refused; approve clears the badge on
+      the timeline; reject removes the entry everywhere

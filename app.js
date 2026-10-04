@@ -111,6 +111,7 @@ function enterFamily(fam) {
   document.getElementById("joinOverlay").classList.add("hidden");
   document.getElementById("demoBanner").classList.toggle("hidden", !demoMode);
   document.getElementById("addEntryBtn").style.display = demoMode ? "none" : "";
+  document.getElementById("reviewBtn").style.display = demoMode ? "none" : "";
   buildDecadeNav();
   subscribeLive();
   loadTimeline();
@@ -561,6 +562,7 @@ document.addEventListener("DOMContentLoaded", () => {
     e.target.value = "";
     menu.classList.add("hidden");
   };
+  document.getElementById("reviewBtn").onclick = () => { location.href = "review.html"; };
   document.getElementById("switchFamilyBtn").onclick = () => { menu.classList.add("hidden"); switchFamily(); };
   document.getElementById("welcomeSwitch").onclick = switchFamily;
 
