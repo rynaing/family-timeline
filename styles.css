@@ -381,3 +381,16 @@ body.privacy-on .photo-caption { display: none; }
   color: var(--teal-deep);
   font-weight: 600;
 }
+
+/* ---------- people ---------- */
+.entry.milestone { border-left-color: var(--teal); cursor: pointer; }
+.entry.milestone h3 { font-size: 0.95rem; }
+.milestone-sub { margin-top: 0; }
+.people-card { max-width: 480px; }
+.people-head { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; margin-bottom: 0.75rem; }
+.people-head h2 { margin: 0; }
+.person-row { border: 1px solid var(--line); border-radius: 12px; padding: 0.7rem 0.85rem; margin-bottom: 0.6rem; background: var(--bg); }
+.person-row.highlight { border-color: var(--teal); box-shadow: 0 0 0 2px color-mix(in srgb, var(--teal) 30%, transparent); }
+.person-name { font-weight: 700; }
+.person-fact { font-size: 0.85rem; margin-top: 0.2rem; }
+body.privacy-on .person-row .entry-body { display: none; }

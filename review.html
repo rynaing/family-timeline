@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Review entries · Family Timeline</title>
+  <meta name="robots" content="noindex, nofollow" />
+  <link rel="stylesheet" href="styles.css" />
+  <style>
+    .review-wrap { max-width: 640px; margin: 0 auto; padding: 1.25rem 1rem 3rem; }
+    .review-head { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; margin-bottom: 1rem; }
+    .review-head h2 { margin: 0; font-size: 1.1rem; }
+    .review-list { display: flex; flex-direction: column; gap: 0.9rem; }
+    .review-list .entry { margin: 0; }
+    .review-actions { display: flex; gap: 0.5rem; margin-top: 0.8rem; }
+    .review-actions .btn { flex: 1; }
+    .btn-reject { color: var(--coral-deep); border-color: var(--coral); }
+    .btn-reject:hover { background: var(--coral); color: #fff; }
+    .signin-card { margin: 0 auto; max-height: none; }
+    .signin-card label { display: block; margin-top: 0.75rem; font-size: 0.88rem; font-weight: 600; }
+    .signin-card input {
+      width: 100%; padding: 0.6rem 0.7rem; border: 1px solid var(--line); border-radius: 10px;
+      background: var(--bg); color: var(--ink); font-size: 0.95rem; margin-top: 0.25rem;
+    }
+    a.btn { text-decoration: none; display: inline-flex; align-items: center; }
+    .tabs { display: flex; gap: 0.4rem; margin-bottom: 1rem; }
+    .tab { border: 1px solid var(--line); background: var(--surface); color: var(--muted); border-radius: 999px; padding: 0.4rem 0.9rem; font-size: 0.88rem; cursor: pointer; }
+    .tab.active { background: var(--coral); border-color: var(--coral); color: #fff; font-weight: 600; }
+    .review-subhead { margin: 1.25rem 0 0; font-size: 0.95rem; color: var(--muted); }
+    .review-actions .btn:only-child { flex: 0 1 auto; }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark">&#10022;</span>
+      <div>
+        <h1>Review entries</h1>
+        <p id="familyName" class="family-name"></p>
+      </div>
+    </div>
+    <div class="topbar-actions">
+      <a href="./" class="btn" title="Back to the timeline">Timeline</a>
+      <button id="themeBtn" class="btn btn-icon" title="Toggle dark mode">&#9790;</button>
+      <button id="signOutBtn" class="btn hidden" title="Forget the owner key on this tab">Sign out</button>
+    </div>
+  </header>
+
+  <main class="review-wrap">
+    <div id="signin" class="card signin-card">
+      <h2>Owner sign-in</h2>
+      <p class="muted">Only the family owner can approve or reject new entries. Use the owner key you saved when you created the family.</p>
+      <div id="codeRow">
+        <label>Family room code
+          <input id="codeInput" type="text" placeholder="e.g. eb08-7358" autocomplete="off" autocapitalize="none" spellcheck="false" />
+        </label>
+      </div>
+      <p id="knownFamily" class="muted small hidden"></p>
+      <label>Owner key
+        <input id="keyInput" type="password" autocomplete="off" autocapitalize="none" spellcheck="false" />
+      </label>
+      <p id="signinError" class="error hidden"></p>
+      <button id="signinBtn" class="btn btn-primary btn-block">Sign in</button>
+    </div>
+
+    <section id="reviewPanel" class="hidden">
+      <div class="tabs">
+        <button class="tab active" data-tab="new">New<span id="newCount"></span></button>
+        <button class="tab" data-tab="edit">Edit &amp; confirm</button>
+      </div>
+      <div class="review-head">
+        <h2 id="pendingCount"></h2>
+        <button id="approveAllBtn" class="btn btn-small hidden">Approve all</button>
+      </div>
+      <div id="reviewList" class="review-list"></div>
+    </section>
+  </main>
+
+  <div id="editModal" class="overlay hidden">
+    <div class="card modal-card">
+      <h2 id="editTitle">Edit</h2>
+      <form id="editForm" novalidate>
+        <div id="editEntryFields">
+          <label>Title<input id="eTitle" type="text" maxlength="120" /></label>
+          <label>Date<input id="eDate" type="date" /></label>
+          <label>Story<textarea id="eBody" rows="4"></textarea></label>
+          <label>Added by<input id="eBy" type="text" maxlength="60" /></label>
+          <fieldset class="uncertain">
+            <legend>Needs confirmation</legend>
+            <label class="check"><input type="checkbox" value="birth_date" /> Birth date</label>
+            <label class="check"><input type="checkbox" value="birthplace" /> Birthplace</label>
+            <label class="check"><input type="checkbox" value="date" /> Date</label>
+          </fieldset>
+        </div>
+        <div id="editPersonFields" class="hidden"></div>
+        <p id="editError" class="error hidden"></p>
+        <div class="modal-actions">
+          <button type="button" id="cancelEditBtn" class="btn">Cancel</button>
+          <button type="submit" id="saveEditBtn" class="btn btn-primary">Save</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="shared.js"></script>
+  <script src="review.js"></script>
+</body>
+</html>
