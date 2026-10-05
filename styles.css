@@ -394,3 +394,26 @@ body.privacy-on .photo-caption { display: none; }
 .person-name { font-weight: 700; }
 .person-fact { font-size: 0.85rem; margin-top: 0.2rem; }
 body.privacy-on .person-row .entry-body { display: none; }
+
+/* ---------- questions to ask ---------- */
+.ask-card { max-width: 520px; }
+.ask-tabs { display: flex; gap: 0.4rem; margin: 0.75rem 0; }
+.ask-tab {
+  flex: 1;
+  border: 1px solid var(--line);
+  background: var(--bg);
+  color: var(--ink);
+  border-radius: 999px;
+  padding: 0.4rem 0.6rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+.ask-tab.active { background: var(--teal); border-color: var(--teal); color: #fff; font-weight: 600; }
+.ask-group { margin: 0.9rem 0 0.4rem; font-size: 0.78rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+.ask-row { border: 1px solid var(--line); border-radius: 12px; padding: 0.65rem 0.85rem; margin-bottom: 0.5rem; background: var(--bg); }
+.ask-row.asked .ask-q { color: var(--muted); text-decoration: line-through; }
+.ask-q { font-size: 0.92rem; line-height: 1.4; }
+.ask-who { font-size: 0.75rem; color: var(--muted); margin-bottom: 0.15rem; }
+.ask-actions { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.5rem; }
+.ask-progress { font-size: 0.8rem; color: var(--muted); margin: 0 0 0.25rem; }
+.entry.flash { box-shadow: 0 0 0 3px color-mix(in srgb, var(--coral) 55%, transparent); transition: box-shadow 0.3s; }

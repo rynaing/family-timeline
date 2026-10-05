@@ -83,6 +83,7 @@ html.gated body > :not(#gate){display:none !important}
   </header>
 
   <div id="menu" class="menu hidden">
+    <button id="askBtn">Questions to ask</button>
     <button id="peopleBtn">People</button>
     <button id="exportBtn">Export timeline (JSON)</button>
     <button id="importBtn">Import timeline (JSON)</button>
@@ -209,6 +210,23 @@ html.gated body > :not(#gate){display:none !important}
     </div>
   </div>
 
+  <!-- Questions to ask -->
+  <div id="askOverlay" class="overlay hidden">
+    <div class="card modal-card ask-card">
+      <h2>Questions to ask</h2>
+      <p class="muted small">Bring these next time you sit down with the elders.</p>
+      <div class="ask-tabs" role="tablist">
+        <button type="button" id="askTabGaps" class="ask-tab active" role="tab">Missing facts</button>
+        <button type="button" id="askTabPrompts" class="ask-tab" role="tab">Conversation starters</button>
+      </div>
+      <div id="askGaps"></div>
+      <div id="askPrompts" class="hidden"></div>
+      <div class="modal-actions">
+        <button type="button" id="closeAskBtn" class="btn">Close</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Add person modal -->
   <div id="personModal" class="overlay hidden">
     <div class="card modal-card">
@@ -229,6 +247,7 @@ html.gated body > :not(#gate){display:none !important}
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <script src="shared.js"></script>
+  <script src="interview.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
