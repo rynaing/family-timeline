@@ -21,6 +21,14 @@ devices, photo uploads to private storage.
   America, passed away. Any date can be just a year. Each person's moments
   show on the timeline, and the decade range widens to fit (a 1920s birth
   gets a 1920s column)
+- **Questions to ask** (menu → Questions to ask): what to ask the elders
+  next. *Missing facts* is worked out from People and entries (no birthplace,
+  a year with no exact date, anything marked "needs confirmation") and
+  clears itself once the answer is filled in. *Conversation starters* is a
+  fixed list (roots, school, coming to America, work and family, things to
+  keep); "Write it down" opens Add a memory with the title filled in. Which
+  starters were asked, and gaps marked "doesn't apply", are remembered on
+  that device only
 - Owner review page (`review.html`, also under the menu as **Review new entries**):
   sign in with the room code and owner key, then approve or reject pending
   entries and people; the **Edit & confirm** tab fixes mistakes, clears
@@ -84,4 +92,7 @@ To open a backup: download the artifact, unzip it, then
       the timeline; reject hides the entry everywhere
 - [ ] People: add one with a year-only birth; it appears on the timeline and
       in the review queue; editing it there updates the timeline
+- [ ] Questions to ask: a person with only a birth year shows "exact
+      birthday?"; "Write it down" pre-fills the title and saving ticks the
+      starter as asked
 - [ ] Eleven wrong room codes in a row get "too many wrong codes"

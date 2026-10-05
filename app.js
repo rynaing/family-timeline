@@ -17,6 +17,7 @@ let familyName = "";
 let db = null;          // supabase client scoped to this family
 let rtChannel = null;   // realtime broadcast channel
 let people = [];        // this family's people (pending + approved)
+let timelineEntries = []; // last loaded entries, for "Questions to ask"
 
 /* ---------------- helpers ---------------- */
 
@@ -137,6 +138,7 @@ function switchFamily() {
   familyId = null; db = null;
   familyName = "";
   people = [];
+  timelineEntries = [];
   demoMode = false;
   document.getElementById("familyName").textContent = "";
   document.getElementById("addEntryBtn").style.display = "";
@@ -184,10 +186,12 @@ async function loadTimeline() {
       if (data) urlMap[p.id] = data.signedUrl;
     }));
 
+    timelineEntries = entries || [];
     const items = timelineItems(entries || []);
     renderTimeline(items, urlMap);
     buildDecadeNav(decadesFor(items));
     renderPeopleList();
+    if (!document.getElementById("askOverlay").classList.contains("hidden")) renderAsk();
   } catch (e) {
     console.error(e);
     main.innerHTML = '<div class="state-msg">Couldn\u2019t load the timeline. Check your connection and try again.</div>';
@@ -247,6 +251,7 @@ function renderTimeline(items, urlMap) {
 function renderEntry(e, urlMap) {
   const card = document.createElement("article");
   card.className = "entry";
+  card.dataset.entryId = e.id;
 
   let html = "";
   if (e.status === "pending") {
@@ -362,6 +367,8 @@ function openModal() {
 function closeModal() {
   document.getElementById("entryModal").classList.add("hidden");
   document.getElementById("entryForm").reset();
+  document.getElementById("fBody").placeholder = "What happened? Who was there?";
+  pendingPromptId = null;
 }
 
 async function submitEntry(ev) {
@@ -411,6 +418,11 @@ async function submitEntry(ev) {
       if (phErr) throw phErr;
     }
 
+    if (pendingPromptId) {
+      const s = askState();
+      s.asked[pendingPromptId] = true;
+      saveAskState(s);
+    }
     closeModal();
     toast("Added \u2014 it\u2019ll show as \u201cNot reviewed yet\u201d until reviewed.");
     pingFamily();
@@ -512,6 +524,140 @@ async function submitPerson(ev) {
   } finally {
     btn.disabled = false;
   }
+}
+
+/* ---------------- questions to ask ----------------
+ * Missing facts come from the people and entries already loaded, so they
+ * clear themselves once someone fills the answer in. Which starters have
+ * been asked, and which gaps "don't apply", are remembered on this device
+ * only (nothing new in the database). */
+
+let askTab = "gaps";
+let pendingPromptId = null; // starter being written down; marked asked on save
+
+function askKey() { return "ft_ask_" + familyId; }
+function askState() {
+  try {
+    const s = JSON.parse(localStorage.getItem(askKey()) || "null");
+    return { asked: (s && s.asked) || {}, dismissed: (s && s.dismissed) || {} };
+  } catch { return { asked: {}, dismissed: {} }; }
+}
+function saveAskState(s) {
+  try { localStorage.setItem(askKey(), JSON.stringify(s)); } catch {}
+}
+
+function askButton(label, onclick, primary) {
+  const b = document.createElement("button");
+  b.type = "button";
+  b.className = "btn btn-small" + (primary ? " btn-primary" : "");
+  b.textContent = label;
+  b.onclick = onclick;
+  return b;
+}
+
+function renderAsk() {
+  const state = askState();
+  const gaps = FT.allGaps(people, timelineEntries, state.dismissed);
+  const askedCount = FT.PROMPT_GROUPS.reduce((n, g) =>
+    n + g.prompts.filter(pr => state.asked[pr.id]).length, 0);
+  document.getElementById("askTabGaps").textContent = "Missing facts (" + gaps.length + ")";
+  document.getElementById("askTabPrompts").textContent =
+    "Conversation starters (" + askedCount + "/" + FT.PROMPT_COUNT + ")";
+  document.getElementById("askTabGaps").classList.toggle("active", askTab === "gaps");
+  document.getElementById("askTabPrompts").classList.toggle("active", askTab === "prompts");
+  document.getElementById("askGaps").classList.toggle("hidden", askTab !== "gaps");
+  document.getElementById("askPrompts").classList.toggle("hidden", askTab !== "prompts");
+
+  const gapBox = document.getElementById("askGaps");
+  gapBox.innerHTML = "";
+  if (!gaps.length) {
+    gapBox.innerHTML = '<p class="muted">' + (people.length
+      ? "Nothing missing that we can spot. Try the conversation starters."
+      : "Add the elders under People (menu \u2192 People) and this list will show what\u2019s still unknown about each of them.") +
+      "</p>";
+  }
+  gaps.forEach(g => {
+    const row = document.createElement("div");
+    row.className = "ask-row";
+    const who = g.kind === "person"
+      ? [g.person.name, g.person.relation].filter(Boolean).join(" \u00b7 ")
+      : "Timeline entry";
+    row.innerHTML = '<div class="ask-who">' + esc(who) + '</div><div class="ask-q">' + esc(g.q) + "</div>";
+    const actions = document.createElement("div");
+    actions.className = "ask-actions";
+    actions.appendChild(askButton("Show", () => {
+      closeAsk();
+      if (g.kind === "person") openPeople(g.person.id);
+      else showEntry(g.entry.id);
+    }));
+    actions.appendChild(askButton("Doesn\u2019t apply", () => {
+      const s = askState();
+      s.dismissed[g.key] = true;
+      saveAskState(s);
+      renderAsk();
+    }));
+    row.appendChild(actions);
+    gapBox.appendChild(row);
+  });
+  if (gaps.length) {
+    const hint = document.createElement("p");
+    hint.className = "muted small";
+    hint.textContent = "Got an answer? The family owner fills it in on the review page (Edit & confirm).";
+    gapBox.appendChild(hint);
+  }
+
+  const promptBox = document.getElementById("askPrompts");
+  promptBox.innerHTML = "";
+  FT.PROMPT_GROUPS.forEach(g => {
+    const head = document.createElement("div");
+    head.className = "ask-group";
+    head.textContent = g.label;
+    promptBox.appendChild(head);
+    g.prompts.forEach(pr => {
+      const asked = !!state.asked[pr.id];
+      const row = document.createElement("div");
+      row.className = "ask-row" + (asked ? " asked" : "");
+      row.innerHTML = '<div class="ask-q">' + esc(pr.q) + "</div>";
+      const actions = document.createElement("div");
+      actions.className = "ask-actions";
+      if (!demoMode) {
+        actions.appendChild(askButton("Write it down", () => {
+          closeAsk();
+          openModal();
+          pendingPromptId = pr.id;
+          document.getElementById("fTitle").value = pr.title;
+          const body = document.getElementById("fBody");
+          body.placeholder = pr.q;
+          body.focus();
+        }, true));
+      }
+      actions.appendChild(askButton(asked ? "Not asked yet" : "Mark asked", () => {
+        const s = askState();
+        if (asked) delete s.asked[pr.id]; else s.asked[pr.id] = true;
+        saveAskState(s);
+        renderAsk();
+      }));
+      row.appendChild(actions);
+      promptBox.appendChild(row);
+    });
+  });
+}
+
+function openAsk() {
+  renderAsk();
+  document.getElementById("askOverlay").classList.remove("hidden");
+}
+function closeAsk() {
+  document.getElementById("askOverlay").classList.add("hidden");
+}
+
+/* Scroll the timeline to an entry and flash it. */
+function showEntry(id) {
+  const card = document.querySelector('.entry[data-entry-id="' + CSS.escape(String(id)) + '"]');
+  if (!card) return;
+  card.scrollIntoView({ behavior: "smooth", inline: "center", block: "center" });
+  card.classList.add("flash");
+  setTimeout(() => card.classList.remove("flash"), 1800);
 }
 
 /* ---------------- export / import ---------------- */
@@ -767,6 +913,13 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("demoCreateBtn").onclick = openCreate;
 
   document.getElementById("personFields").innerHTML = FT.personFormHTML("p");
+  document.getElementById("askBtn").onclick = () => { menu.classList.add("hidden"); openAsk(); };
+  document.getElementById("closeAskBtn").onclick = closeAsk;
+  document.getElementById("askOverlay").addEventListener("click", (e) => {
+    if (e.target.id === "askOverlay") closeAsk();
+  });
+  document.getElementById("askTabGaps").onclick = () => { askTab = "gaps"; renderAsk(); };
+  document.getElementById("askTabPrompts").onclick = () => { askTab = "prompts"; renderAsk(); };
   document.getElementById("peopleBtn").onclick = () => { menu.classList.add("hidden"); openPeople(); };
   document.getElementById("closePeopleBtn").onclick = closePeople;
   document.getElementById("peopleOverlay").addEventListener("click", (e) => {
