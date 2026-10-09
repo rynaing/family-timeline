@@ -43,6 +43,8 @@ html.gated body > :not(#gate){display:none !important}
     try { localStorage.setItem(KEY, "1"); } catch(e){}
   }
   try { if (localStorage.getItem(KEY) === "1") { unlock(); return; } } catch(e){}
+  // share links open straight in: ?join= (family link, checked by the room code) and ?share= (friends view)
+  if (/[?&](join|share)=/.test(location.search)) { document.documentElement.classList.remove("gated"); var g0 = document.getElementById("gate"); if (g0) g0.remove(); else document.addEventListener("DOMContentLoaded", function(){ var g = document.getElementById("gate"); if (g) g.remove(); }); return; }
   function sha(s){
     return crypto.subtle.digest("SHA-256", new TextEncoder().encode(s)).then(function(b){
       return Array.prototype.map.call(new Uint8Array(b), function(x){ return ("0"+x.toString(16)).slice(-2); }).join("");
@@ -76,6 +78,7 @@ html.gated body > :not(#gate){display:none !important}
     </div>
     <div class="topbar-actions">
       <button id="addEntryBtn" class="btn btn-primary" title="Add a memory">&#43; Add</button>
+      <button id="shareBtn" class="btn" title="Share this timeline">Share</button>
       <button id="eyeBtn" class="btn btn-icon" title="Privacy mode: hide stories &amp; photos">&#128065;</button>
       <button id="themeBtn" class="btn btn-icon" title="Toggle dark mode">&#9790;</button>
       <button id="menuBtn" class="btn btn-icon" title="Menu">&#9776;</button>
@@ -94,6 +97,10 @@ html.gated body > :not(#gate){display:none !important}
   <div id="demoBanner" class="demo-banner hidden">
     <span>You're viewing the demo timeline.</span>
     <button id="demoCreateBtn" class="btn btn-small">Add your family</button>
+  </div>
+
+  <div id="shareBanner" class="demo-banner hidden">
+    <span id="shareBannerText"></span>
   </div>
 
   <main id="timeline" class="timeline">
@@ -121,6 +128,31 @@ html.gated body > :not(#gate){display:none !important}
   </div>
 
   <!-- Create family modal -->
+  <div id="shareOverlay" class="overlay hidden">
+    <div class="card modal-card">
+      <h2>Share this timeline</h2>
+      <div class="share-row">
+        <div>
+          <strong>Friends</strong>
+          <p class="muted">Events and dates only. No stories or photos.</p>
+        </div>
+        <button id="copyFriendsBtn" class="btn btn-small">Copy link</button>
+      </div>
+      <div class="share-row">
+        <div>
+          <strong>Family</strong>
+          <p class="muted">Everything, including stories and photos. They can add memories too.</p>
+        </div>
+        <button id="copyFamilyBtn" class="btn btn-small">Copy link</button>
+      </div>
+      <p id="shareError" class="error hidden">Couldn&rsquo;t get the links. Check your connection and try again.</p>
+      <div class="modal-actions">
+        <button id="resetShareBtn" class="link-btn">Stop old friends links</button>
+        <button id="closeShareBtn" class="btn">Done</button>
+      </div>
+    </div>
+  </div>
+
   <div id="createOverlay" class="overlay hidden">
     <div class="card modal-card">
       <div id="createStep1">

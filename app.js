@@ -111,6 +111,7 @@ function enterFamily(fam) {
   document.getElementById("joinOverlay").classList.add("hidden");
   document.getElementById("demoBanner").classList.toggle("hidden", !demoMode);
   document.getElementById("addEntryBtn").style.display = demoMode ? "none" : "";
+  document.getElementById("shareBtn").style.display = demoMode ? "none" : "";
   buildDecadeNav();
   subscribeLive();
   loadTimeline();
@@ -147,6 +148,72 @@ function switchFamily() {
   document.getElementById("roomCodeInput").value = "";
   document.getElementById("joinError").classList.add("hidden");
   document.getElementById("welcomeBack").classList.add("hidden");
+}
+
+/* ---------------- share links ---------------- */
+
+// ?share=<token>: the friends view. Read-only titles and dates, nothing saved on this device.
+async function openFriendsView(token) {
+  document.body.classList.add("share-view");
+  const main = document.getElementById("timeline");
+  main.innerHTML = '<div class="state-msg">Loading&hellip;</div>';
+  try {
+    const anon = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    const { data, error } = await anon.rpc("shared_timeline", { token });
+    if (error) throw error;
+    if (!data || !data.length) {
+      main.innerHTML = '<div class="state-msg">This link isn\u2019t working anymore. Ask for a new one.</div>';
+      return;
+    }
+    const name = data[0].family_name;
+    document.getElementById("familyName").textContent = name;
+    document.getElementById("shareBannerText").textContent =
+      "A shared view of " + name + "\u2019s timeline: events and dates only.";
+    document.getElementById("shareBanner").classList.remove("hidden");
+    const entries = data.map(r => ({
+      title: r.title, entry_date: r.entry_date, decade: r.decade,
+      uncertain_fields: r.date_unsure ? ["date"] : [],
+    }));
+    renderTimeline(entries, {});
+    buildDecadeNav(entries.some(e => decadeOf(e) === "Timeless"));
+  } catch (e) {
+    console.error(e);
+    main.innerHTML = '<div class="state-msg">Couldn\u2019t load the timeline. Check your connection and try again.</div>';
+  }
+}
+
+let shareInfo = null;
+function siteUrl() { return location.origin + location.pathname; }
+
+async function openShare() {
+  document.getElementById("shareError").classList.add("hidden");
+  document.getElementById("shareOverlay").classList.remove("hidden");
+  if (shareInfo && shareInfo.family === familyId) return;
+  shareInfo = null;
+  const { data, error } = await db.rpc("family_share_info");
+  if (error || !data || !data.length) {
+    document.getElementById("shareError").classList.remove("hidden");
+    return;
+  }
+  shareInfo = { family: familyId, code: data[0].invite_code, token: data[0].share_token };
+}
+function closeShare() { document.getElementById("shareOverlay").classList.add("hidden"); }
+
+async function copyShare(kind, btn) {
+  if (!shareInfo) await openShare();
+  if (!shareInfo) return;
+  const url = kind === "friends"
+    ? siteUrl() + "?share=" + encodeURIComponent(shareInfo.token)
+    : siteUrl() + "?join=" + encodeURIComponent(shareInfo.code);
+  copyToClipboard(url, btn);
+}
+
+async function resetShare() {
+  if (!confirm("Make a new friends link? Links you already sent to friends will stop working.")) return;
+  const { data, error } = await db.rpc("reset_share_link");
+  if (error || !data) { document.getElementById("shareError").classList.remove("hidden"); return; }
+  if (shareInfo) shareInfo.token = data;
+  toast("New friends link ready. Copy it to share.");
 }
 
 /* ---------------- loading & rendering ---------------- */
@@ -593,6 +660,28 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("enterTimelineBtn").onclick = enterCreatedFamily;
   document.getElementById("demoBtn").onclick = joinDemo;
   document.getElementById("demoCreateBtn").onclick = openCreate;
+
+  document.getElementById("shareBtn").onclick = openShare;
+  document.getElementById("closeShareBtn").onclick = closeShare;
+  document.getElementById("shareOverlay").addEventListener("click", (e) => {
+    if (e.target.id === "shareOverlay") closeShare();
+  });
+  document.getElementById("copyFriendsBtn").onclick = (e) => copyShare("friends", e.target);
+  document.getElementById("copyFamilyBtn").onclick = (e) => copyShare("family", e.target);
+  document.getElementById("resetShareBtn").onclick = resetShare;
+
+  const params = new URLSearchParams(location.search);
+  if (params.get("share")) {
+    openFriendsView(params.get("share"));
+    return;
+  }
+  if (params.get("join")) {
+    history.replaceState(null, "", location.pathname);
+    document.getElementById("joinOverlay").classList.remove("hidden");
+    document.getElementById("roomCodeInput").value = params.get("join");
+    joinWithCode(params.get("join"));
+    return;
+  }
 
   if (!silentRejoin()) {
     document.getElementById("joinOverlay").classList.remove("hidden");
