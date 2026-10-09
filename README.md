@@ -17,6 +17,9 @@ devices, photo uploads to private storage.
 - Export timeline to JSON / import entries from JSON
 - Privacy (eye) mode hides stories and photos for shoulder-surfers
 - `*` marks fields that still need confirmation
+- **Share** button: a friends link (`?share=<token>`, events and dates only, read-only, no
+  access code) and a family link (`?join=<room code>`, the full timeline). "Stop old friends
+  links" makes a new token. Database side: `supabase/share_links.sql`
 
 ## Security notes
 

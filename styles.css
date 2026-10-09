@@ -381,3 +381,10 @@ body.privacy-on .photo-caption { display: none; }
   color: var(--teal-deep);
   font-weight: 600;
 }
+
+/* ---------- share ---------- */
+.share-row { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 0.7rem 0; border-top: 1px solid var(--line); }
+.share-row p { margin: 0.2rem 0 0; font-size: 0.85rem; }
+.share-row .btn { flex: none; }
+#resetShareBtn { margin-right: auto; font-size: 0.82rem; }
+body.share-view #addEntryBtn, body.share-view #shareBtn, body.share-view #eyeBtn, body.share-view #menuBtn { display: none !important; }
