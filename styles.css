@@ -110,6 +110,17 @@ body {
 }
 .menu button:hover, .menu .menu-link:hover { background: var(--bg); }
 .menu .menu-link { color: var(--ink); text-decoration: none; padding: 0.75rem 1rem; font-size: 0.9rem; }
+.early-badge {
+  display: inline-block;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--primary-text);
+  background: color-mix(in srgb, var(--primary) 12%, transparent);
+  border-radius: 999px;
+  padding: 0.2rem 0.65rem;
+  margin-bottom: 0.6rem;
+}
+.early-note { font-size: 0.85rem; color: var(--primary-text); margin: -0.25rem 0 0.5rem; }
 .join-footer { text-align: center; font-size: 0.78rem; color: var(--muted); margin: 0.9rem 0 0; }
 .join-footer a { color: var(--primary-text); }
 
