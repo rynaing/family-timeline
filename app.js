@@ -11,6 +11,7 @@ const SUPABASE_KEY = "sb_publishable_hXr3XBpmRYSDiJNiOzt6yw_DttyIY6y";
 const DECADES = ["1930s","1940s","1950s","1960s","1970s","1980s","1990s","2000s","2010s","2020s"];
 const LS_FAMILY = "ft_family";   // { id, name }
 const LS_THEME  = "ft_theme";
+const LS_NAME   = "ft_name";     // "Your name" on the add form, remembered per device
 
 const UNCERTAIN_LABELS = {
   birth_date: "birth date",
@@ -54,6 +55,11 @@ function decadeOf(entry) {
     if (!isNaN(y)) return Math.floor(y / 10) * 10 + "s";
   }
   return "Timeless";
+}
+
+// "The Naings" -> "The Naings’", "Rivera" -> "Rivera’s"
+function possessive(name) {
+  return /s$/i.test(name) ? name + "\u2019" : name + "\u2019s";
 }
 
 function uncertainLabel(f) {
@@ -138,9 +144,11 @@ function switchFamily() {
   localStorage.removeItem(LS_FAMILY);
   familyId = null; db = null;
   familyName = "";
+  firstRender = true;
   demoMode = false;
   document.getElementById("familyName").textContent = "";
   document.getElementById("addEntryBtn").style.display = "";
+  document.getElementById("shareBtn").style.display = "";
   document.getElementById("demoBanner").classList.add("hidden");
   document.getElementById("timeline").innerHTML = "";
   document.getElementById("decadeNav").innerHTML = "";
@@ -168,14 +176,13 @@ async function openFriendsView(token) {
     const name = data[0].family_name;
     document.getElementById("familyName").textContent = name;
     document.getElementById("shareBannerText").textContent =
-      "A shared view of " + name + "\u2019s timeline: events and dates only.";
+      "A shared view of " + possessive(name) + " timeline: events and dates only.";
     document.getElementById("shareBanner").classList.remove("hidden");
     const entries = data.map(r => ({
       title: r.title, entry_date: r.entry_date, decade: r.decade,
       uncertain_fields: r.date_unsure ? ["date"] : [],
     }));
     renderTimeline(entries, {});
-    buildDecadeNav(entries.some(e => decadeOf(e) === "Timeless"));
   } catch (e) {
     console.error(e);
     main.innerHTML = '<div class="state-msg">Couldn\u2019t load the timeline. Check your connection and try again.</div>';
@@ -220,7 +227,9 @@ async function resetShare() {
 
 async function loadTimeline() {
   const main = document.getElementById("timeline");
-  main.innerHTML = '<div class="state-msg">Loading your family\u2019s timeline&hellip;</div>';
+  // Live-sync refreshes re-render in place, so only show the loading
+  // message the first time (otherwise the page jumps on every ping).
+  if (firstRender) main.innerHTML = '<div class="state-msg">Loading your family\u2019s timeline&hellip;</div>';
   try {
     const { data: entries, error } = await db
       .from("entries")
@@ -240,16 +249,22 @@ async function loadTimeline() {
     }));
 
     renderTimeline(entries || [], urlMap);
-    // Show a Timeless jump button if any entry has no date.
-    buildDecadeNav((entries || []).some(e => decadeOf(e) === "Timeless"));
   } catch (e) {
     console.error(e);
     main.innerHTML = '<div class="state-msg">Couldn\u2019t load the timeline. Check your connection and try again.</div>';
   }
 }
 
+let firstRender = true;
+
+function isHorizontal() {
+  return getComputedStyle(document.getElementById("timeline")).flexDirection === "row";
+}
+
 function renderTimeline(entries, urlMap) {
   const main = document.getElementById("timeline");
+  // Keep the reader's place when a live-sync refresh re-renders.
+  const keepX = main.scrollLeft;
   main.innerHTML = "";
   const byDecade = {};
   entries.forEach(e => {
@@ -259,7 +274,7 @@ function renderTimeline(entries, urlMap) {
 
   [...DECADES, ...(byDecade["Timeless"] ? ["Timeless"] : [])].forEach(dec => {
     const section = document.createElement("section");
-    section.className = "decade";
+    section.className = "decade" + ((byDecade[dec] || []).length ? "" : " is-empty");
     section.id = "dec-" + dec;
     section.innerHTML = '<div class="decade-head">' + esc(dec) + "</div>";
     const body = document.createElement("div");
@@ -273,6 +288,20 @@ function renderTimeline(entries, urlMap) {
     section.appendChild(body);
     main.appendChild(section);
   });
+
+  buildDecadeNav(byDecade);
+
+  if (firstRender) {
+    firstRender = false;
+    // Open on the first decade that has memories instead of an empty 1930s.
+    const first = DECADES.concat("Timeless").find(d => byDecade[d]);
+    if (first && isHorizontal()) {
+      main.scrollLeft = document.getElementById("dec-" + first).offsetLeft - main.offsetLeft - 16;
+    }
+  } else {
+    main.scrollLeft = keepX;
+  }
+  updateActiveNav();
 }
 
 function renderEntry(e, urlMap) {
@@ -307,7 +336,7 @@ function renderEntry(e, urlMap) {
       const url = urlMap[p.id];
       if (url) {
         html += '<img src="' + esc(url) + '" alt="' + esc(p.caption || e.title) +
-          '" loading="lazy" />';
+          '" loading="lazy" tabindex="0" title="Tap to enlarge" />';
         if (p.caption) html += '<div class="photo-caption">' + esc(p.caption) + "</div>";
       }
     });
@@ -322,21 +351,61 @@ function renderEntry(e, urlMap) {
   return card;
 }
 
-function buildDecadeNav(hasTimeless) {
+// byDecade: { "1960s": [entries], ... }. Decades with memories get a filled
+// chip and a count; empty ones stay dim so the busy decades stand out.
+function buildDecadeNav(byDecade) {
+  byDecade = byDecade || {};
   const nav = document.getElementById("decadeNav");
   nav.innerHTML = "";
-  const labels = hasTimeless ? [...DECADES, "Timeless"] : DECADES;
+  const labels = byDecade["Timeless"] ? [...DECADES, "Timeless"] : DECADES;
   labels.forEach(dec => {
     const b = document.createElement("button");
-    b.textContent = dec;
+    const n = (byDecade[dec] || []).length;
+    b.dataset.dec = dec;
+    b.className = n ? "has-entries" : "";
+    b.innerHTML = esc(dec) + (n ? ' <span class="nav-count">' + n + "</span>" : "");
     b.onclick = () => {
       const el = document.getElementById("dec-" + dec);
-      if (el) el.scrollIntoView({ behavior: "smooth", inline: "start", block: "nearest" });
-      nav.querySelectorAll("button").forEach(x => x.classList.remove("active"));
-      b.classList.add("active");
+      if (!el) return;
+      if (isHorizontal()) {
+        el.scrollIntoView({ behavior: "smooth", inline: "start", block: "nearest" });
+      } else {
+        // Scroll the page so the decade lands just under the sticky bars.
+        const offset = document.getElementById("decadeNav").getBoundingClientRect().bottom + 8;
+        window.scrollTo({ top: window.scrollY + el.getBoundingClientRect().top - offset, behavior: "smooth" });
+      }
+      setActiveNav(dec);
     };
     nav.appendChild(b);
   });
+}
+
+function setActiveNav(dec) {
+  const nav = document.getElementById("decadeNav");
+  nav.querySelectorAll("button").forEach(x => {
+    const on = x.dataset.dec === dec;
+    x.classList.toggle("active", on);
+    if (on && nav.scrollWidth > nav.clientWidth) {
+      x.scrollIntoView({ block: "nearest", inline: "nearest" });
+    }
+  });
+}
+
+// Highlight the decade currently in view as the reader scrolls.
+function updateActiveNav() {
+  const sections = [...document.querySelectorAll("#timeline .decade")];
+  if (!sections.length) return;
+  let current = sections[0];
+  if (isHorizontal()) {
+    const left = document.getElementById("timeline").getBoundingClientRect().left + 40;
+    for (const s of sections) if (s.getBoundingClientRect().right > left) { current = s; break; }
+  } else {
+    const top = document.getElementById("decadeNav").getBoundingClientRect().bottom + 40;
+    for (const s of sections) if (s.getBoundingClientRect().bottom > top) { current = s; break; }
+  }
+  const dec = current.id.slice(4);
+  const active = document.querySelector("#decadeNav button.active");
+  if (!active || active.dataset.dec !== dec) setActiveNav(dec);
 }
 
 /* ---------------- live sync ----------------
@@ -367,6 +436,8 @@ function pingFamily() {
 
 function openModal() {
   document.getElementById("entryModal").classList.remove("hidden");
+  document.getElementById("fBy").value = localStorage.getItem(LS_NAME) || "";
+  setTimeout(() => document.getElementById("fTitle").focus(), 60);
 }
 function closeModal() {
   document.getElementById("entryModal").classList.add("hidden");
@@ -377,15 +448,19 @@ async function submitEntry(ev) {
   ev.preventDefault();
   const btn = document.getElementById("saveEntryBtn");
   btn.disabled = true;
+  btn.textContent = "Saving\u2026";
   let entrySaved = false;
   try {
     const title = document.getElementById("fTitle").value.trim();
     const entryDate = document.getElementById("fDate").value || null;
+    const roughDecade = document.getElementById("fDecade").value || null;
     const body = document.getElementById("fBody").value.trim();
     const createdBy = document.getElementById("fBy").value.trim() || null;
     const uncertain = [...document.querySelectorAll(".uncertain input:checked")]
       .map(c => c.value);
-    const decade = entryDate ? Math.floor(parseInt(entryDate.slice(0, 4), 10) / 10) * 10 + "s" : null;
+    // An exact date wins; otherwise use the "roughly when" decade, if picked.
+    const decade = entryDate ? Math.floor(parseInt(entryDate.slice(0, 4), 10) / 10) * 10 + "s" : roughDecade;
+    if (createdBy) localStorage.setItem(LS_NAME, createdBy);
 
     // Status is forced to 'pending' by the database trigger (review queue).
     const { data: rows, error } = await db.from("entries").insert({
@@ -406,7 +481,9 @@ async function submitEntry(ev) {
     // (e.g. IMG_001.jpg from different folders), which used to make the
     // second upload throw *after* the entry was already saved.
     const files = document.getElementById("fPhotos").files;
-    for (const file of files) {
+    for (let i = 0; i < files.length; i++) {
+      if (files.length > 1) btn.textContent = "Uploading photo " + (i + 1) + " of " + files.length + "\u2026";
+      const file = await shrinkPhoto(files[i]);
       const uniq = Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 8);
       const path = familyId + "/" + entryId + "/" + uniq + "-" + file.name;
       const { error: upErr } = await db.storage.from("family-photos").upload(path, file);
@@ -431,7 +508,48 @@ async function submitEntry(ev) {
       : "Couldn\u2019t save that entry. Try again.");
   } finally {
     btn.disabled = false;
+    btn.textContent = "Save";
   }
+}
+
+/* Phone photos are often 4-10 MB. Scale them to at most 2000px on the long
+ * side as JPEG before upload: much faster on mobile data and quicker to load
+ * for everyone else. Falls back to the original file if anything goes wrong
+ * (or if the original is already smaller). GIFs are left alone. */
+async function shrinkPhoto(file) {
+  const MAX = 2000;
+  try {
+    if (!/^image\//.test(file.type) || file.type === "image/gif" || !window.createImageBitmap) return file;
+    const bmp = await createImageBitmap(file, { imageOrientation: "from-image" });
+    const scale = Math.min(1, MAX / Math.max(bmp.width, bmp.height));
+    if (scale === 1 && file.size < 1.5 * 1024 * 1024) { bmp.close && bmp.close(); return file; }
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(bmp.width * scale);
+    canvas.height = Math.round(bmp.height * scale);
+    canvas.getContext("2d").drawImage(bmp, 0, 0, canvas.width, canvas.height);
+    bmp.close && bmp.close();
+    const blob = await new Promise(r => canvas.toBlob(r, "image/jpeg", 0.85));
+    if (!blob || blob.size >= file.size) return file;
+    const name = file.name.replace(/\.[^.]+$/, "") + ".jpg";
+    return new File([blob], name, { type: "image/jpeg" });
+  } catch (e) {
+    console.warn("photo resize skipped", e);
+    return file;
+  }
+}
+
+/* ---------------- photo viewer ---------------- */
+
+function openLightbox(img) {
+  const box = document.getElementById("lightbox");
+  document.getElementById("lightboxImg").src = img.src;
+  document.getElementById("lightboxImg").alt = img.alt;
+  document.getElementById("lightboxCaption").textContent = img.alt;
+  box.classList.remove("hidden");
+}
+function closeLightbox() {
+  document.getElementById("lightbox").classList.add("hidden");
+  document.getElementById("lightboxImg").src = "";
 }
 
 /* ---------------- export / import ---------------- */
@@ -460,7 +578,7 @@ function exportTimeline() {
       const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
       const a = document.createElement("a");
       a.href = URL.createObjectURL(blob);
-      a.download = "family-timeline-" + new Date().toISOString().slice(0, 10) + ".json";
+      a.download = "kintime-" + new Date().toISOString().slice(0, 10) + ".json";
       a.click();
       URL.revokeObjectURL(a.href);
       toast("Timeline exported.");
@@ -600,6 +718,44 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
+  // Photo viewer: tap (or Enter on) any timeline photo to see it full size.
+  const timelineEl = document.getElementById("timeline");
+  timelineEl.addEventListener("click", (e) => {
+    if (e.target.matches(".entry-photos img")) openLightbox(e.target);
+  });
+  timelineEl.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && e.target.matches(".entry-photos img")) openLightbox(e.target);
+  });
+  document.getElementById("lightbox").addEventListener("click", closeLightbox);
+
+  // Keep the decade chips in step with what's on screen.
+  let navRaf = 0;
+  const onScroll = () => {
+    if (navRaf) return;
+    navRaf = requestAnimationFrame(() => { navRaf = 0; updateActiveNav(); });
+  };
+  timelineEl.addEventListener("scroll", onScroll, { passive: true });
+  window.addEventListener("scroll", onScroll, { passive: true });
+
+  // Escape closes whatever is open on top.
+  document.addEventListener("keydown", (e) => {
+    if (e.key !== "Escape") return;
+    if (!document.getElementById("lightbox").classList.contains("hidden")) return closeLightbox();
+    if (!document.getElementById("entryModal").classList.contains("hidden")) return closeModal();
+    if (!document.getElementById("shareOverlay").classList.contains("hidden")) return closeShare();
+    // Not on the "your family is ready" step: the owner key is only shown once.
+    if (!document.getElementById("createOverlay").classList.contains("hidden")) {
+      if (document.getElementById("createStep2").classList.contains("hidden")) closeCreate();
+      return;
+    }
+    document.getElementById("menu").classList.add("hidden");
+  });
+
+  document.getElementById("menuThemeBtn").onclick = () => {
+    document.getElementById("menu").classList.add("hidden");
+    document.getElementById("themeBtn").click();
+  };
+
   document.getElementById("themeBtn").onclick = () => {
     const cur = document.documentElement.getAttribute("data-theme");
     const next = cur === "dark" ? "light" : "dark";
@@ -630,6 +786,11 @@ document.addEventListener("DOMContentLoaded", () => {
   };
   document.getElementById("switchFamilyBtn").onclick = () => { menu.classList.add("hidden"); switchFamily(); };
   document.getElementById("welcomeSwitch").onclick = switchFamily;
+
+  // Exact date and "roughly when" are either/or: picking one clears the other.
+  const fDate = document.getElementById("fDate"), fDecade = document.getElementById("fDecade");
+  fDate.addEventListener("change", () => { if (fDate.value) fDecade.value = ""; });
+  fDecade.addEventListener("change", () => { if (fDecade.value) fDate.value = ""; });
 
   document.getElementById("addEntryBtn").onclick = openModal;
   document.getElementById("cancelEntryBtn").onclick = closeModal;

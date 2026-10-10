@@ -1,4 +1,4 @@
-# Family Timeline — website
+# Kintime — family timeline website (kintime.app)
 
 The public website for the family timeline. It talks to the Supabase backend
 at runtime: room-code join, per-family data isolation, live sync between
@@ -15,6 +15,10 @@ devices, photo uploads to private storage.
   pings; the channel name is the family's unguessable UUID)
 - Photo uploads to the private `family-photos` bucket, shown via signed URLs
 - Export timeline to JSON / import entries from JSON
+- Empty decades shrink to a slim line; decade chips show memory counts and follow the scroll
+- "Roughly when" decade picker for memories without an exact date
+- Photos are shrunk to 2000px JPEG in the browser before upload; tap a photo to view it full size
+- Link previews (`og.png`), favicon and home-screen icon
 - Privacy (eye) mode hides stories and photos for shoulder-surfers
 - `*` marks fields that still need confirmation
 - **Share** button: a friends link (`?share=<token>`, events and dates only, read-only, no

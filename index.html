@@ -3,17 +3,29 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Family Timeline</title>
-<meta name="robots" content="noindex, nofollow" />
+  <title>Kintime &middot; your family's timeline</title>
+  <meta name="robots" content="noindex, nofollow" />
+  <meta name="description" content="A private timeline of your family's stories and photos, decade by decade. Join with your family's room code." />
+  <meta name="theme-color" content="#0e9488" />
+  <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="apple-touch-icon.png" />
+  <!-- Link previews when a family or friends link is texted or emailed -->
+  <meta property="og:site_name" content="Kintime" />
+  <meta property="og:title" content="Kintime &middot; your family's timeline" />
+  <meta property="og:description" content="Our family's stories and photos, decade by decade. Tap to open." />
+  <meta property="og:image" content="https://kintime.app/og.png" />
+  <meta property="og:url" content="https://kintime.app/" />
+  <meta property="og:type" content="website" />
+  <meta name="twitter:card" content="summary_large_image" />
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
 
   <header class="topbar">
     <div class="brand">
-      <span class="brand-mark">&#10022;</span>
+      <img src="favicon.svg" class="brand-logo" alt="" width="32" height="32" />
       <div>
-        <h1>Family Timeline</h1>
+        <h1>Kintime</h1>
         <p id="familyName" class="family-name"></p>
       </div>
     </div>
@@ -30,6 +42,7 @@
     <button id="exportBtn">Export timeline (JSON)</button>
     <button id="importBtn">Import timeline (JSON)</button>
     <input type="file" id="importFile" accept="application/json" class="hidden" />
+    <button id="menuThemeBtn" class="menu-phone-only">Dark mode on/off</button>
     <button id="switchFamilyBtn">Switch family</button>
   </div>
 
@@ -142,6 +155,15 @@
         <label>Date
           <input id="fDate" type="date" />
         </label>
+        <label>Don&rsquo;t know the exact date?
+          <select id="fDecade">
+            <option value="">Pick roughly when&hellip;</option>
+            <option>1930s</option><option>1940s</option><option>1950s</option>
+            <option>1960s</option><option>1970s</option><option>1980s</option>
+            <option>1990s</option><option>2000s</option><option>2010s</option>
+            <option>2020s</option>
+          </select>
+        </label>
         <label>Story
           <textarea id="fBody" rows="4" placeholder="What happened? Who was there?"></textarea>
         </label>
@@ -164,6 +186,12 @@
         </div>
       </form>
     </div>
+  </div>
+
+  <!-- Photo viewer -->
+  <div id="lightbox" class="lightbox hidden" title="Tap to close">
+    <img id="lightboxImg" alt="" />
+    <p id="lightboxCaption"></p>
   </div>
 
   <div id="toast" class="toast hidden"></div>
