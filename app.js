@@ -1,6 +1,6 @@
 /* Family Timeline — Supabase-backed frontend.
  *
- * PUBLIC-BY-DESIGN values below (same as the room code already shared with
+ * PUBLIC-BY-DESIGN values below (same as the family code already shared with
  * the family): the Supabase URL and the *publishable* key. They can only do
  * what the database's row-level security allows: read/write the joined
  * family's own rows. There is no secret here.
@@ -961,7 +961,7 @@ document.addEventListener("DOMContentLoaded", () => {
     showLanding();
     document.getElementById("roomCodeInput").value = params.get("join");
     joinWithCode(params.get("join"));
-    loadCloudflareAnalytics();   // after the room code is out of the address bar
+    loadCloudflareAnalytics();   // after the family code is out of the address bar
     return;
   }
 
