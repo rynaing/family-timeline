@@ -119,6 +119,7 @@ a.brand, a.btn { color: inherit; text-decoration: none; }
 .privacy h2 { margin: 0.5rem 0 0; font-size: 1.6rem; }
 .privacy h3 { margin: 1.6rem 0 0.3rem; font-size: 1.05rem; color: var(--primary-text); }
 .privacy p { margin: 0.3rem 0; }
+.privacy a { color: var(--primary-text); }
 
 /* ---------- decade nav ---------- */
 .decade-nav {
