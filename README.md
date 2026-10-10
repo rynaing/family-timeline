@@ -7,6 +7,7 @@ devices, photo uploads to private storage.
 ## What's in the page
 
 - Horizontal decade scroll (1930s → today, reaching back to the 1800s when a family has older memories), "Sunrise" theme (violet, sunset pink and warm orange on cream), dark mode
+- Landing page for new visitors: animated hero, a looping product video (`media/intro.mp4`, filmed with a fictional family by `tools/intro-video/`), feature cards and the room-code form. The video pauses once you join and never autoplays with reduced motion on
 - Room-code join (`join_family` RPC); family remembered on the device
 - Every request carries the `x-family-id` header — the database only ever
   returns the joined family's own rows (the Jackbox rule)

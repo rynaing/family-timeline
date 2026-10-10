@@ -139,12 +139,35 @@ function joinDemo() {
   track("demo_opened");
 }
 
+/* ---------------- landing page ---------------- */
+
+// The intro video only plays while the landing page is showing, and not at
+// all for people who've asked their device for reduced motion.
+function showLanding() {
+  const landing = document.getElementById("joinOverlay");
+  landing.classList.remove("hidden");
+  landing.scrollTop = 0;
+  const v = document.getElementById("introVideo");
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    v.controls = true;
+  } else {
+    v.play().catch(() => { v.controls = true; });
+  }
+}
+function hideLanding() {
+  document.getElementById("joinOverlay").classList.add("hidden");
+  document.getElementById("introVideo").pause();
+}
+
 /* ---------------- join flow ---------------- */
 
 async function joinWithCode(code) {
   code = code.trim().toLowerCase();
   if (!code) return;
-  const joinError = () => document.getElementById("joinError").classList.remove("hidden");
+  const joinError = () => {
+    document.getElementById("joinError").classList.remove("hidden");
+    document.getElementById("join").scrollIntoView({ behavior: "smooth", block: "center" });
+  };
   try {
     const anon = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
     const { data, error } = await anon.rpc("join_family", { code });
@@ -169,7 +192,7 @@ function enterFamily(fam) {
   demoMode = (fam.id === DEMO_FAMILY_ID);
   document.body.classList.toggle("demo", demoMode);
   document.getElementById("familyName").textContent = familyName;
-  document.getElementById("joinOverlay").classList.add("hidden");
+  hideLanding();
   document.getElementById("demoBanner").classList.toggle("hidden", !demoMode);
   document.getElementById("addEntryBtn").style.display = demoMode ? "none" : "";
   document.getElementById("shareBtn").style.display = demoMode ? "none" : "";
@@ -208,7 +231,7 @@ function switchFamily() {
   document.getElementById("demoBanner").classList.add("hidden");
   document.getElementById("timeline").innerHTML = "";
   document.getElementById("decadeNav").innerHTML = "";
-  document.getElementById("joinOverlay").classList.remove("hidden");
+  showLanding();
   document.getElementById("roomCodeInput").value = "";
   document.getElementById("joinError").classList.add("hidden");
   document.getElementById("welcomeBack").classList.add("hidden");
@@ -924,7 +947,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
   if (params.get("join")) {
     history.replaceState(null, "", location.pathname);
-    document.getElementById("joinOverlay").classList.remove("hidden");
+    showLanding();
     document.getElementById("roomCodeInput").value = params.get("join");
     joinWithCode(params.get("join"));
     loadCloudflareAnalytics();   // after the room code is out of the address bar
@@ -932,7 +955,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   if (!silentRejoin()) {
-    document.getElementById("joinOverlay").classList.remove("hidden");
+    showLanding();
   }
   track("visit");
   loadCloudflareAnalytics();
