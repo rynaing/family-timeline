@@ -27,8 +27,8 @@ devices, photo uploads to private storage.
 
 ## Analytics
 
-- **Visitors / page views:** Cloudflare Web Analytics (free, no cookies). Paste the site token
-  into `CF_ANALYTICS_TOKEN` at the top of `app.js`. It is never loaded on friends links.
+- **Visitors / page views:** Cloudflare Web Analytics (free, no cookies). The site token is set
+  in `CF_ANALYTICS_TOKEN` at the top of `app.js` (empty turns it off). It is never loaded on friends links.
 - **Actions:** `supabase/analytics.sql` (already applied) adds `app_events` and `log_event()`.
   The page logs joins, new families, memories, photos, share and backup clicks: action name,
   family id and time only. See the numbers with `select * from kintime_stats(30);` in the SQL editor.

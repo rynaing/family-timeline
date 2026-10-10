@@ -52,14 +52,14 @@ let rtChannel = null;   // realtime broadcast channel
 
 /* ---------------- analytics ----------------
  * Two free, cookie-free pieces:
- *  1. Cloudflare Web Analytics for visitors and page views. Paste the site's
- *     token from the Cloudflare dashboard below; empty means it stays off.
+ *  1. Cloudflare Web Analytics for visitors and page views (site: kintime.app). The
+ *     token below comes from the Cloudflare dashboard; empty turns it off.
  *     It's never loaded on friends links, so their share token isn't sent.
  *  2. track("entry_added") etc. counts actions in our own database
  *     (supabase/analytics.sql): just the action name, family id and time,
  *     never titles, stories, names or photos.
  */
-const CF_ANALYTICS_TOKEN = "";
+const CF_ANALYTICS_TOKEN = "9fd514ca51264ed99c880b007c965db3";
 
 function loadCloudflareAnalytics() {
   if (!CF_ANALYTICS_TOKEN || document.body.classList.contains("share-view")) return;
