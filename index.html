@@ -23,7 +23,9 @@
 
   <header class="topbar">
     <div class="brand">
-      <img src="favicon.svg" class="brand-logo" alt="" width="32" height="32" />
+      <button id="homeBtn" class="home-btn" title="Kintime home page">
+        <img src="favicon.svg" class="brand-logo" alt="" width="32" height="32" />
+      </button>
       <div>
         <h1>Kintime</h1>
         <p id="familyName" class="family-name"></p>
@@ -39,6 +41,7 @@
   </header>
 
   <div id="menu" class="menu hidden">
+    <button id="menuHomeBtn">Kintime home page</button>
     <button id="exportBtn">Download a backup (JSON)</button>
     <button id="menuThemeBtn" class="menu-phone-only">Dark mode on/off</button>
     <button id="switchFamilyBtn">Switch family</button>
@@ -75,7 +78,8 @@
         <img src="favicon.svg" class="brand-logo" alt="" width="32" height="32" />
         <strong>Kintime</strong>
       </span>
-      <a href="#join" class="btn btn-small landing-code-link">I have a room code</a>
+      <a href="#join" id="landingCodeLink" class="btn btn-small landing-code-link">I have a room code</a>
+      <button id="landingBackBtn" class="btn btn-small btn-primary hidden"></button>
     </header>
 
     <section class="hero">

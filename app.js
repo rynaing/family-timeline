@@ -147,6 +147,11 @@ function showLanding() {
   const landing = document.getElementById("joinOverlay");
   landing.classList.remove("hidden");
   landing.scrollTop = 0;
+  // Visiting home from inside a family keeps it; this button goes straight back.
+  const back = document.getElementById("landingBackBtn");
+  back.textContent = familyId ? "Back to " + familyName : "";
+  back.classList.toggle("hidden", !familyId);
+  document.getElementById("landingCodeLink").classList.toggle("hidden", !!familyId);
   const v = document.getElementById("introVideo");
   if (matchMedia("(prefers-reduced-motion: reduce)").matches) {
     v.controls = true;
@@ -186,6 +191,9 @@ async function joinWithCode(code) {
 }
 
 function enterFamily(fam) {
+  // Coming from the home page while already in a family: drop the old one's live channel.
+  if (rtChannel && db) { db.removeChannel(rtChannel); rtChannel = null; }
+  firstRender = true;
   familyId = fam.id;
   familyName = fam.name;
   db = makeClient(familyId);
@@ -889,6 +897,9 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   document.getElementById("exportBtn").onclick = () => { menu.classList.add("hidden"); exportTimeline(); };
+  document.getElementById("homeBtn").onclick = showLanding;
+  document.getElementById("menuHomeBtn").onclick = () => { menu.classList.add("hidden"); showLanding(); };
+  document.getElementById("landingBackBtn").onclick = hideLanding;
   document.getElementById("switchFamilyBtn").onclick = () => { menu.classList.add("hidden"); switchFamily(); };
   document.getElementById("welcomeSwitch").onclick = switchFamily;
 

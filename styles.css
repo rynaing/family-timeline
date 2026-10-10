@@ -694,3 +694,9 @@ body.share-view #addEntryBtn, body.share-view #shareBtn, body.share-view #eyeBtn
 }
 .landing { scroll-behavior: smooth; }
 .landing .join-card { width: calc(100% - 2.5rem); }
+
+/* The logo in the top bar goes to the home page (the family stays remembered). */
+.home-btn { background: none; border: none; padding: 0; cursor: pointer; display: flex; border-radius: 9px; }
+.home-btn:hover .brand-logo { transform: scale(1.06); }
+.home-btn .brand-logo { transition: transform 0.15s; }
+#landingBackBtn { max-width: 60vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
