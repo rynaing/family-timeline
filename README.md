@@ -19,6 +19,7 @@ devices, photo uploads to private storage.
 - "Roughly when" decade picker for memories without an exact date
 - Photos are shrunk to 2000px JPEG in the browser before upload; tap a photo to view it full size
 - Link previews (`og.png`), favicon and home-screen icon
+- Plain-language privacy page (`privacy.html`), linked from the menu and the room-code screen
 - Privacy (eye) mode hides stories and photos for shoulder-surfers
 - `*` marks fields that still need confirmation
 - **Share** button: a friends link (`?share=<token>`, events and dates only, read-only, no
