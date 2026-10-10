@@ -1,33 +1,39 @@
-/* Family Timeline — teal & coral theme */
+/* Kintime (family timeline) — "Sunrise" theme */
 
 :root {
-  --teal: #0e9488;
-  --teal-deep: #0b6e66;
-  --coral: #fb6f5c;
-  --coral-deep: #e14e3a;
-  --bg: #f6f4ef;
+  /* "Sunrise": violet + sunset pink + warm orange on cream */
+  --primary: #7c3aed;
+  --primary-deep: #6d28d9;
+  --primary-text: #6d28d9;      /* primary used as text/links */
+  --accent: #ff7a59;
+  --accent-deep: #d9481f;
+  --head-grad: linear-gradient(135deg, #7c3aed, #d63a7a);
+  --bg: #fff7ee;
   --surface: #ffffff;
-  --ink: #22312f;
-  --muted: #6b7a78;
-  --line: #e5ded2;
-  --border: #e5ded2;
-  --bg-soft: #efece3;
-  --badge-pending: #f5b942;
-  --shadow: 0 2px 10px rgba(20, 40, 38, 0.08);
+  --ink: #2b2240;
+  --muted: #776c8a;
+  --line: #f1e3d3;
+  --border: #f1e3d3;
+  --bg-soft: #fbefe3;
+  --badge-pending: #ffd166;
+  --shadow: 0 2px 10px rgba(60, 30, 90, 0.08);
+  --scrim: rgba(25, 14, 40, 0.55);
 }
 
 [data-theme="dark"] {
-  --bg: #121a19;
-  --surface: #1b2524;
-  --ink: #ecf3f1;
-  --muted: #93a5a2;
-  --line: #2c3a38;
-  --border: #2c3a38;
-  --bg-soft: #182220;
-  --shadow: 0 2px 12px rgba(0, 0, 0, 0.35);
+  --primary-text: #b9a0ff;
+  --bg: #16121f;
+  --surface: #211b2e;
+  --ink: #f4effb;
+  --muted: #a99fbe;
+  --line: #352b48;
+  --border: #352b48;
+  --bg-soft: #1c1727;
+  --shadow: 0 2px 12px rgba(0, 0, 0, 0.4);
 }
 
 * { box-sizing: border-box; }
+input, select, textarea, button { font-family: inherit; }
 
 body {
   margin: 0;
@@ -51,7 +57,7 @@ body {
 }
 
 .brand { display: flex; align-items: center; gap: 0.6rem; }
-.brand-mark { font-size: 1.6rem; color: var(--teal); }
+.brand-logo { width: 32px; height: 32px; flex: none; }
 .brand h1 { margin: 0; font-size: 1.15rem; }
 .family-name { margin: 0; font-size: 0.8rem; color: var(--muted); }
 
@@ -65,14 +71,15 @@ body {
   padding: 0.45rem 0.9rem;
   font-size: 0.9rem;
   cursor: pointer;
+  white-space: nowrap;
 }
 .btn-primary {
-  background: var(--teal);
-  border-color: var(--teal);
+  background: var(--primary);
+  border-color: var(--primary);
   color: #fff;
   font-weight: 600;
 }
-.btn-primary:hover { background: var(--teal-deep); }
+.btn-primary:hover { background: var(--primary-deep); }
 .btn-icon { padding: 0.45rem 0.6rem; }
 .btn-block { width: 100%; margin-top: 0.75rem; }
 .btn:disabled { opacity: 0.55; cursor: wait; }
@@ -101,7 +108,18 @@ body {
   font-size: 0.9rem;
   cursor: pointer;
 }
-.menu button:hover { background: var(--bg); }
+.menu button:hover, .menu .menu-link:hover { background: var(--bg); }
+.menu .menu-link { color: var(--ink); text-decoration: none; padding: 0.75rem 1rem; font-size: 0.9rem; }
+.join-footer { text-align: center; font-size: 0.78rem; color: var(--muted); margin: 0.9rem 0 0; }
+.join-footer a { color: var(--primary-text); }
+
+/* ---------- privacy page ---------- */
+a.brand, a.btn { color: inherit; text-decoration: none; }
+.privacy { max-width: 640px; margin: 0 auto; padding: 1.5rem 1.25rem 4rem; line-height: 1.6; }
+.privacy h2 { margin: 0.5rem 0 0; font-size: 1.6rem; }
+.privacy h3 { margin: 1.6rem 0 0.3rem; font-size: 1.05rem; color: var(--primary-text); }
+.privacy p { margin: 0.3rem 0; }
+.privacy a { color: var(--primary-text); }
 
 /* ---------- decade nav ---------- */
 .decade-nav {
@@ -125,9 +143,27 @@ body {
   font-size: 0.8rem;
   cursor: pointer;
 }
+.decade-nav button.has-entries {
+  background: var(--surface);
+  border-color: var(--primary);
+  color: var(--primary-text);
+  font-weight: 600;
+}
+.nav-count {
+  display: inline-block;
+  min-width: 1.2em;
+  margin-left: 0.15rem;
+  padding: 0 0.3rem;
+  border-radius: 999px;
+  background: var(--primary);
+  color: #fff;
+  font-size: 0.7rem;
+  line-height: 1.4;
+}
+.decade-nav button.active .nav-count { background: #fff; color: var(--accent-deep); }
 .decade-nav button.active {
-  background: var(--coral);
-  border-color: var(--coral);
+  background: var(--accent-deep);
+  border-color: var(--accent-deep);
   color: #fff;
   font-weight: 600;
 }
@@ -139,6 +175,7 @@ body {
   overflow-x: auto;
   padding: 1.25rem 1rem 3rem;
   scroll-snap-type: x proximity;
+  scroll-padding-inline: 1rem;
   align-items: flex-start;
 }
 
@@ -152,7 +189,7 @@ body {
   overflow: hidden;
 }
 .decade-head {
-  background: linear-gradient(135deg, var(--teal), var(--teal-deep));
+  background: var(--head-grad);
   color: #fff;
   padding: 0.7rem 1rem;
   font-weight: 700;
@@ -162,16 +199,55 @@ body {
 .decade-body { padding: 0.75rem; display: flex; flex-direction: column; gap: 0.75rem; }
 .decade-empty { color: var(--muted); font-size: 0.85rem; font-style: italic; padding: 0.5rem 0.25rem; }
 
+/* Empty decades shrink so the ones with memories carry the page. */
+.decade.is-empty {
+  flex-basis: 150px;
+  background: transparent;
+  border-style: dashed;
+  box-shadow: none;
+}
+.decade.is-empty .decade-head {
+  background: none;
+  color: var(--muted);
+  font-weight: 600;
+}
+.decade.is-empty .decade-empty { padding-top: 0; }
+.add-here { padding: 0.35rem 0.25rem 0; text-align: left; }
+body.share-view .add-here, body.demo .add-here { display: none; }
+
+/* Folded runs of empty decades: one row that opens like an accordion. */
+.decade-gap { flex: 0 0 auto; display: flex; align-items: flex-start; gap: 1rem; scroll-snap-align: start; }
+.gap-toggle {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.2rem;
+  width: 130px;
+  padding: 0.7rem 0.9rem;
+  border: 1px dashed var(--line);
+  border-radius: 16px;
+  background: transparent;
+  color: var(--muted);
+  text-align: left;
+  cursor: pointer;
+}
+.gap-toggle:hover { border-color: var(--primary); color: var(--ink); }
+.gap-label { font-weight: 600; font-size: 0.95rem; }
+.gap-note { font-size: 0.78rem; font-style: italic; }
+.gap-chevron { font-size: 0.8rem; transform: rotate(-90deg); transition: transform 0.15s; }
+.decade-gap.open .gap-chevron { transform: rotate(90deg); }
+.gap-body { display: none; gap: 1rem; align-items: flex-start; }
+.decade-gap.open .gap-body { display: flex; }
+
 /* ---------- entry cards ---------- */
 .entry {
   border: 1px solid var(--line);
-  border-left: 4px solid var(--coral);
+  border-left: 4px solid var(--accent);
   border-radius: 12px;
   padding: 0.75rem 0.85rem;
   background: var(--bg);
 }
-.entry-date { font-size: 0.78rem; color: var(--teal-deep); font-weight: 600; }
-[data-theme="dark"] .entry-date { color: var(--teal); }
+.entry-date { font-size: 0.78rem; color: var(--primary-text); font-weight: 600; }
 .entry h3 { margin: 0.25rem 0 0.4rem; font-size: 1rem; }
 .entry-body { font-size: 0.88rem; line-height: 1.45; white-space: pre-wrap; }
 .entry-meta { margin-top: 0.5rem; font-size: 0.75rem; color: var(--muted); }
@@ -184,14 +260,14 @@ body {
   padding: 0.15rem 0.6rem;
   margin-bottom: 0.4rem;
 }
-.badge-pending { background: var(--badge-pending); color: #4a3200; }
+.badge-pending { background: var(--badge-pending); color: #5a3d00; }
 
 .uncertain-note {
   font-size: 0.75rem;
-  color: var(--coral-deep);
+  color: var(--accent-deep);
   margin-top: 0.4rem;
 }
-.asterisk { color: var(--coral-deep); font-weight: 700; }
+.asterisk { color: var(--accent-deep); font-weight: 700; }
 
 .entry-photos { display: flex; gap: 0.4rem; flex-wrap: wrap; margin-top: 0.5rem; }
 .entry-photos img {
@@ -202,18 +278,35 @@ body {
   border: 1px solid var(--line);
 }
 .photo-caption { font-size: 0.75rem; color: var(--muted); width: 100%; }
+.entry-photos img { cursor: zoom-in; }
+
+/* ---------- photo viewer ---------- */
+.lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  background: rgba(5, 10, 10, 0.92);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  cursor: zoom-out;
+}
+.lightbox img { max-width: 100%; max-height: 85vh; border-radius: 8px; object-fit: contain; }
+.lightbox p { color: #e8efed; font-size: 0.9rem; margin: 0.75rem 0 0; text-align: center; }
 
 /* ---------- privacy (eye) mode ---------- */
 body.privacy-on .entry-body,
 body.privacy-on .entry-photos,
 body.privacy-on .photo-caption { display: none; }
-#eyeBtn.on { background: var(--coral); border-color: var(--coral); color: #fff; }
+#eyeBtn.on { background: var(--accent); border-color: var(--accent); color: #fff; }
 
 /* ---------- overlays / modals ---------- */
 .overlay {
   position: fixed;
   inset: 0;
-  background: rgba(10, 20, 19, 0.55);
+  background: var(--scrim);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -233,11 +326,12 @@ body.privacy-on .photo-caption { display: none; }
 .card h2 { margin-top: 0; }
 .muted { color: var(--muted); }
 .small { font-size: 0.8rem; }
-.error { color: var(--coral-deep); font-size: 0.85rem; }
+.error { color: var(--accent-deep); font-size: 0.85rem; }
 
 .join-card input[type="text"],
 .modal-card input[type="text"],
 .modal-card input[type="date"],
+.modal-card select,
 .modal-card textarea {
   width: 100%;
   padding: 0.6rem 0.7rem;
@@ -272,7 +366,7 @@ body.privacy-on .photo-caption { display: none; }
   align-items: center;
   white-space: nowrap;
 }
-.link-btn { background: none; border: none; color: var(--teal); cursor: pointer; font-size: 0.85rem; text-decoration: underline; }
+.link-btn { background: none; border: none; color: var(--primary-text); cursor: pointer; font-size: 0.85rem; text-decoration: underline; }
 
 .toast {
   position: fixed;
@@ -299,8 +393,41 @@ body.privacy-on .photo-caption { display: none; }
     align-items: stretch;
   }
   .decade { flex: none; width: 100%; }
+  /* Empty decades become one slim line instead of a full card. */
+  .decade.is-empty { display: flex; align-items: center; flex: none; flex-wrap: wrap; }
+  .decade.is-empty .add-here { padding: 0 0 0 0.6rem; }
+  .decade-gap { flex-direction: column; align-items: stretch; gap: 0.6rem; }
+  .gap-toggle { width: 100%; flex-direction: row; align-items: center; gap: 0.75rem; padding: 0.55rem 0.9rem; }
+  .gap-chevron { margin-left: auto; transform: none; }
+  .decade-gap.open .gap-chevron { transform: rotate(180deg); }
+  .gap-body { flex-direction: column; align-items: stretch; gap: 0.6rem; }
+  /* The folded row already says "No memories yet"; unfolded rows just offer to add one. */
+  .gap-body .decade-empty { display: none; }
+  .gap-body .decade.is-empty .add-here { padding: 0; }
+  .decade.is-empty .decade-head { padding: 0.45rem 0.9rem; font-size: 0.9rem; }
+  .decade.is-empty .decade-body { padding: 0.45rem 0.9rem 0.45rem 0; }
+  .decade.is-empty .decade-empty { padding: 0; font-size: 0.8rem; }
+  .timeline { gap: 0.6rem; }
+  .decade-nav { scrollbar-width: none; }
+  .decade-nav::-webkit-scrollbar { display: none; }
+  /* 16px+ inputs stop iOS Safari from zooming in when a field is tapped. */
+  .join-card input[type="text"], .modal-card input, .modal-card select, .modal-card textarea { font-size: 16px; }
   .brand h1 { font-size: 1rem; }
   .btn { padding: 0.45rem 0.7rem; }
+}
+
+/* Small phones: keep the top bar on one line. Dark mode moves into the menu. */
+.menu-phone-only { display: none; }
+@media (max-width: 480px) {
+  .topbar { padding: 0.6rem 0.75rem; gap: 0.5rem; }
+  .brand { min-width: 0; gap: 0.45rem; }
+  .brand > div { min-width: 0; }
+  .brand-logo { width: 28px; height: 28px; }
+  .family-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .topbar-actions { gap: 0.3rem; flex: none; }
+  .topbar .btn { padding: 0.4rem 0.6rem; }
+  #themeBtn { display: none; }
+  .menu .menu-phone-only { display: block; }
 }
 
 /* ---------- create family ---------- */
@@ -346,8 +473,8 @@ body.privacy-on .photo-caption { display: none; }
 }
 .warning {
   font-size: 0.85rem;
-  color: var(--coral-deep);
-  background: color-mix(in srgb, var(--coral) 12%, transparent);
+  color: var(--accent-deep);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
   border-radius: 0.5rem;
   padding: 0.6rem 0.8rem;
 }
@@ -358,7 +485,7 @@ body.privacy-on .photo-caption { display: none; }
   margin: 0.9rem auto 0;
   background: none;
   border: none;
-  color: var(--teal-deep);
+  color: var(--primary-text);
   font-size: 0.9rem;
   cursor: pointer;
   text-decoration: underline;
@@ -370,7 +497,7 @@ body.privacy-on .photo-caption { display: none; }
   justify-content: center;
   gap: 0.8rem;
   flex-wrap: wrap;
-  background: var(--teal);
+  background: var(--head-grad);
   color: #fff;
   font-size: 0.9rem;
   padding: 0.55rem 1rem;
@@ -378,7 +505,7 @@ body.privacy-on .photo-caption { display: none; }
 .demo-banner .btn-small {
   background: #fff;
   border-color: #fff;
-  color: var(--teal-deep);
+  color: var(--primary-deep);
   font-weight: 600;
 }
 

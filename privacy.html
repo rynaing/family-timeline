@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Privacy &middot; Kintime</title>
+  <meta name="description" content="What Kintime stores, who can see it, and how analytics works." />
+  <meta name="theme-color" content="#7c3aed" />
+  <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="styles.css" />
+  <script>
+    // Match the theme the reader picked in the app.
+    try {
+      var t = localStorage.getItem("ft_theme") ||
+        (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+      document.documentElement.setAttribute("data-theme", t);
+    } catch (e) {}
+  </script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="./">
+      <img src="favicon.svg" class="brand-logo" alt="" width="32" height="32" />
+      <div><h1>Kintime</h1></div>
+    </a>
+    <a class="btn" href="./">Back to timeline</a>
+  </header>
+
+  <main class="privacy">
+    <h2>Privacy</h2>
+    <p class="muted">Last updated October 10, 2026</p>
+
+    <h3>What we store</h3>
+    <p>Your family's name and the memories you add: titles, dates, stories, the name you type in
+      "Your name", and any photos. Photos are kept in private storage and are only shown through
+      links that expire after an hour.</p>
+
+    <h3>Who can see it</h3>
+    <p>Anyone with your family's room code can see the whole timeline and add to it, so only share
+      the code with family. A friends link shows titles and dates only, never stories, photos or
+      names, and you can turn old friends links off from the Share menu.</p>
+
+    <h3>On your device</h3>
+    <p>Kintime uses no cookies. Your browser remembers which family you joined, whether you like
+      dark mode, and the name you add memories under, so you don't have to type them again.
+      "Switch family" in the menu clears the family from your device.</p>
+
+    <h3>Analytics</h3>
+    <p>We use Cloudflare Web Analytics to count visits. It doesn't use cookies or follow you to
+      other sites, and it isn't loaded on friends links. We also count a few actions in our own
+      database, like "a memory was added" or "a share link was copied", with only the action,
+      which family it was, and the time. Never titles, stories, names or photos.</p>
+
+    <h3>What we don't do</h3>
+    <p>No ads, and we never sell or share your family's memories.</p>
+
+    <h3>Backups and deleting</h3>
+    <p>Anyone in the family can download a backup of the timeline's text from the menu. To have a
+      family's timeline and photos deleted, ask whoever set up your family on Kintime to email
+      us.</p>
+
+    <h3>Contact</h3>
+    <p>Questions or requests: <a href="mailto:hello@kintime.app">hello@kintime.app</a></p>
+  </main>
+</body>
+</html>
