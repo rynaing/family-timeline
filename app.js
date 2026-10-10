@@ -380,7 +380,7 @@ function renderEntry(e, urlMap) {
     html += '<span class="badge badge-pending">Not reviewed yet</span>';
   }
   const dateStr = e.entry_date ? fmtDate(e.entry_date) : "";
-  // uncertain_fields comes from the jsonb column / imported JSON — coerce to an
+  // uncertain_fields comes from the jsonb column — coerce to an
   // array so one malformed entry can't throw mid-render and brick the timeline.
   const uf = Array.isArray(e.uncertain_fields) ? e.uncertain_fields : [];
   const hasUncertainDate = uf.some(f =>
@@ -631,7 +631,7 @@ function closeLightbox() {
   document.getElementById("lightboxImg").src = "";
 }
 
-/* ---------------- export / import ---------------- */
+/* ---------------- export (backup) ---------------- */
 
 function exportTimeline() {
   db.from("entries").select("*, photos(*)")
@@ -663,40 +663,6 @@ function exportTimeline() {
       toast("Timeline exported.");
     })
     .catch(e => { console.error(e); toast("Export failed."); });
-}
-
-function importTimeline(file) {
-  const reader = new FileReader();
-  reader.onload = async () => {
-    try {
-      const payload = JSON.parse(reader.result);
-      if (!payload || typeof payload !== "object" || !Array.isArray(payload.entries)) {
-        toast("That file doesn\u2019t look like a timeline export.");
-        return;
-      }
-      const list = payload.entries;
-      let n = 0;
-      for (const e of list) {
-        const { error } = await db.from("entries").insert({
-          family_id: familyId,
-          title: e.title || "Untitled",
-          body: e.body || "",
-          entry_date: e.entry_date || null,
-          decade: e.decade || null,
-          uncertain_fields: Array.isArray(e.uncertain_fields) ? e.uncertain_fields : [],
-          created_by: e.created_by || null,
-        });
-        if (!error) n++;
-      }
-      toast("Imported " + n + " of " + list.length + " entries (pending review). Photos need re-uploading.");
-      pingFamily();
-      loadTimeline();
-    } catch (e) {
-      console.error(e);
-      toast("That file couldn\u2019t be imported.");
-    }
-  };
-  reader.readAsText(file);
 }
 
 /* ---------------- create family flow ---------------- */
@@ -865,12 +831,6 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   document.getElementById("exportBtn").onclick = () => { menu.classList.add("hidden"); exportTimeline(); };
-  document.getElementById("importBtn").onclick = () => document.getElementById("importFile").click();
-  document.getElementById("importFile").onchange = (e) => {
-    if (e.target.files[0]) importTimeline(e.target.files[0]);
-    e.target.value = "";
-    menu.classList.add("hidden");
-  };
   document.getElementById("switchFamilyBtn").onclick = () => { menu.classList.add("hidden"); switchFamily(); };
   document.getElementById("welcomeSwitch").onclick = switchFamily;
 

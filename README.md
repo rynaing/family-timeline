@@ -14,7 +14,7 @@ devices, photo uploads to private storage.
 - Live sync via a private per-family broadcast channel (no row data in the
   pings; the channel name is the family's unguessable UUID)
 - Photo uploads to the private `family-photos` bucket, shown via signed URLs
-- Export timeline to JSON / import entries from JSON
+- Download a backup of the timeline text as JSON (menu). Import was removed: it skipped photos and let anyone with the room code bulk-add entries
 - Runs of empty decades fold into one accordion row ("1930s – 1950s") that opens to "+ Add one from the 1940s"; decade chips show memory counts and follow the scroll
 - "Roughly when" decade picker for memories without an exact date
 - Photos are shrunk to 2000px JPEG in the browser before upload; tap a photo to view it full size
@@ -49,4 +49,4 @@ devices, photo uploads to private storage.
 - [ ] Upload a photo — it renders on the other device
 - [ ] Wrong code shows an error; switching family clears the session
 - [ ] Privacy eye mode hides stories/photos; dark mode persists
-- [ ] Export downloads JSON; import adds entries as pending
+- [ ] "Download a backup" saves a JSON file
