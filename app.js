@@ -50,6 +50,33 @@ let familyName = "";
 let db = null;          // supabase client scoped to this family
 let rtChannel = null;   // realtime broadcast channel
 
+/* ---------------- analytics ----------------
+ * Two free, cookie-free pieces:
+ *  1. Cloudflare Web Analytics for visitors and page views. Paste the site's
+ *     token from the Cloudflare dashboard below; empty means it stays off.
+ *     It's never loaded on friends links, so their share token isn't sent.
+ *  2. track("entry_added") etc. counts actions in our own database
+ *     (supabase/analytics.sql): just the action name, family id and time,
+ *     never titles, stories, names or photos.
+ */
+const CF_ANALYTICS_TOKEN = "";
+
+function loadCloudflareAnalytics() {
+  if (!CF_ANALYTICS_TOKEN || document.body.classList.contains("share-view")) return;
+  const s = document.createElement("script");
+  s.defer = true;
+  s.src = "https://static.cloudflareinsights.com/beacon.min.js";
+  s.setAttribute("data-cf-beacon", JSON.stringify({ token: CF_ANALYTICS_TOKEN }));
+  document.head.appendChild(s);
+}
+
+function track(ev) {
+  try {
+    const client = db || window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    client.rpc("log_event", { ev }).then(() => {}, () => {});
+  } catch {}
+}
+
 /* ---------------- helpers ---------------- */
 
 function esc(s) {
@@ -109,6 +136,7 @@ function joinDemo() {
   const fam = { id: DEMO_FAMILY_ID, name: DEMO_FAMILY_NAME };
   localStorage.setItem(LS_FAMILY, JSON.stringify(fam));
   enterFamily(fam);
+  track("demo_opened");
 }
 
 /* ---------------- join flow ---------------- */
@@ -127,6 +155,7 @@ async function joinWithCode(code) {
     const fam = { id: data[0].family_id, name: data[0].family_name };
     localStorage.setItem(LS_FAMILY, JSON.stringify(fam));
     enterFamily(fam);
+    track("join");
   } catch (e) {
     console.error(e);
     toast("Couldn't reach the server \u2014 check your connection.");
@@ -222,6 +251,7 @@ function siteUrl() { return location.origin + location.pathname; }
 async function openShare() {
   document.getElementById("shareError").classList.add("hidden");
   document.getElementById("shareOverlay").classList.remove("hidden");
+  track("share_opened");
   if (shareInfo && shareInfo.family === familyId) return;
   shareInfo = null;
   const { data, error } = await db.rpc("family_share_info");
@@ -240,6 +270,7 @@ async function copyShare(kind, btn) {
     ? siteUrl() + "?share=" + encodeURIComponent(shareInfo.token)
     : siteUrl() + "?join=" + encodeURIComponent(shareInfo.code);
   copyToClipboard(url, btn);
+  track(kind === "friends" ? "share_copied_friends" : "share_copied_family");
 }
 
 async function resetShare() {
@@ -554,6 +585,7 @@ async function submitEntry(ev) {
     if (error) throw error;
     const entryId = rows[0].id;
     entrySaved = true;
+    track("entry_added");
 
     // Photos → private bucket at <family_id>/<entry_id>/<unique-name>.
     // The unique suffix avoids collisions when two files share a basename
@@ -574,6 +606,7 @@ async function submitEntry(ev) {
         caption: null,
       });
       if (phErr) throw phErr;
+      track("photo_uploaded");
     }
 
     closeModal();
@@ -660,7 +693,8 @@ function exportTimeline() {
       a.download = "kintime-" + new Date().toISOString().slice(0, 10) + ".json";
       a.click();
       URL.revokeObjectURL(a.href);
-      toast("Timeline exported.");
+      toast("Backup downloaded.");
+      track("backup_downloaded");
     })
     .catch(e => { console.error(e); toast("Export failed."); });
 }
@@ -718,6 +752,7 @@ async function doCreateFamily() {
     }
     const f = data[0];
     pendingFamily = { id: f.family_id, name: f.family_name };
+    track("family_created");
     document.getElementById("newRoomCode").textContent = f.invite_code;
     document.getElementById("newOwnerSecret").textContent = f.owner_secret;
     document.getElementById("createStep1").classList.add("hidden");
@@ -884,6 +919,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const params = new URLSearchParams(location.search);
   if (params.get("share")) {
     openFriendsView(params.get("share"));
+    track("friends_view");
     return;
   }
   if (params.get("join")) {
@@ -891,10 +927,13 @@ document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("joinOverlay").classList.remove("hidden");
     document.getElementById("roomCodeInput").value = params.get("join");
     joinWithCode(params.get("join"));
+    loadCloudflareAnalytics();   // after the room code is out of the address bar
     return;
   }
 
   if (!silentRejoin()) {
     document.getElementById("joinOverlay").classList.remove("hidden");
   }
+  track("visit");
+  loadCloudflareAnalytics();
 });

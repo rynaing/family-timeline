@@ -25,6 +25,14 @@ devices, photo uploads to private storage.
   access code) and a family link (`?join=<room code>`, the full timeline). "Stop old friends
   links" makes a new token. Database side: `supabase/share_links.sql`
 
+## Analytics
+
+- **Visitors / page views:** Cloudflare Web Analytics (free, no cookies). Paste the site token
+  into `CF_ANALYTICS_TOKEN` at the top of `app.js`. It is never loaded on friends links.
+- **Actions:** `supabase/analytics.sql` (already applied) adds `app_events` and `log_event()`.
+  The page logs joins, new families, memories, photos, share and backup clicks: action name,
+  family id and time only. See the numbers with `select * from kintime_stats(30);` in the SQL editor.
+
 ## Security notes
 
 - `app.js` contains the Supabase URL and the **publishable** key. This is
