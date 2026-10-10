@@ -197,6 +197,32 @@ body {
   font-weight: 600;
 }
 .decade.is-empty .decade-empty { padding-top: 0; }
+.add-here { padding: 0.35rem 0.25rem 0; text-align: left; }
+body.share-view .add-here, body.demo .add-here { display: none; }
+
+/* Folded runs of empty decades: one row that opens like an accordion. */
+.decade-gap { flex: 0 0 auto; display: flex; align-items: flex-start; gap: 1rem; scroll-snap-align: start; }
+.gap-toggle {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.2rem;
+  width: 130px;
+  padding: 0.7rem 0.9rem;
+  border: 1px dashed var(--line);
+  border-radius: 16px;
+  background: transparent;
+  color: var(--muted);
+  text-align: left;
+  cursor: pointer;
+}
+.gap-toggle:hover { border-color: var(--teal); color: var(--ink); }
+.gap-label { font-weight: 600; font-size: 0.95rem; }
+.gap-note { font-size: 0.78rem; font-style: italic; }
+.gap-chevron { font-size: 0.8rem; transform: rotate(-90deg); transition: transform 0.15s; }
+.decade-gap.open .gap-chevron { transform: rotate(90deg); }
+.gap-body { display: none; gap: 1rem; align-items: flex-start; }
+.decade-gap.open .gap-body { display: flex; }
 
 /* ---------- entry cards ---------- */
 .entry {
@@ -354,7 +380,16 @@ body.privacy-on .photo-caption { display: none; }
   }
   .decade { flex: none; width: 100%; }
   /* Empty decades become one slim line instead of a full card. */
-  .decade.is-empty { display: flex; align-items: center; flex: none; }
+  .decade.is-empty { display: flex; align-items: center; flex: none; flex-wrap: wrap; }
+  .decade.is-empty .add-here { padding: 0 0 0 0.6rem; }
+  .decade-gap { flex-direction: column; align-items: stretch; gap: 0.6rem; }
+  .gap-toggle { width: 100%; flex-direction: row; align-items: center; gap: 0.75rem; padding: 0.55rem 0.9rem; }
+  .gap-chevron { margin-left: auto; transform: none; }
+  .decade-gap.open .gap-chevron { transform: rotate(180deg); }
+  .gap-body { flex-direction: column; align-items: stretch; gap: 0.6rem; }
+  /* The folded row already says "No memories yet"; unfolded rows just offer to add one. */
+  .gap-body .decade-empty { display: none; }
+  .gap-body .decade.is-empty .add-here { padding: 0; }
   .decade.is-empty .decade-head { padding: 0.45rem 0.9rem; font-size: 0.9rem; }
   .decade.is-empty .decade-body { padding: 0.45rem 0.9rem 0.45rem 0; }
   .decade.is-empty .decade-empty { padding: 0; font-size: 0.8rem; }

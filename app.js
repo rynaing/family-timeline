@@ -138,6 +138,7 @@ function enterFamily(fam) {
   familyName = fam.name;
   db = makeClient(familyId);
   demoMode = (fam.id === DEMO_FAMILY_ID);
+  document.body.classList.toggle("demo", demoMode);
   document.getElementById("familyName").textContent = familyName;
   document.getElementById("joinOverlay").classList.add("hidden");
   document.getElementById("demoBanner").classList.toggle("hidden", !demoMode);
@@ -171,6 +172,7 @@ function switchFamily() {
   familyName = "";
   firstRender = true;
   demoMode = false;
+  document.body.classList.remove("demo");
   document.getElementById("familyName").textContent = "";
   document.getElementById("addEntryBtn").style.display = "";
   document.getElementById("shareBtn").style.display = "";
@@ -297,36 +299,76 @@ function renderTimeline(entries, urlMap) {
     (byDecade[d] = byDecade[d] || []).push(e);
   });
 
+  // Runs of empty decades fold into one accordion row ("1890s – 1950s").
+  let gap = null;
   decadesFor(byDecade).forEach(dec => {
+    const list = byDecade[dec] || [];
     const section = document.createElement("section");
-    section.className = "decade" + ((byDecade[dec] || []).length ? "" : " is-empty");
+    section.className = "decade" + (list.length ? "" : " is-empty");
     section.id = "dec-" + dec;
+    section.dataset.dec = dec;
     section.innerHTML = '<div class="decade-head">' + esc(dec) + "</div>";
     const body = document.createElement("div");
     body.className = "decade-body";
-    const list = byDecade[dec] || [];
     if (!list.length) {
-      body.innerHTML = '<div class="decade-empty">No memories yet.</div>';
+      body.innerHTML = '<div class="decade-empty">No memories yet.</div>' +
+        '<button class="link-btn add-here" data-dec="' + esc(dec) + '">+ Add one from the ' + esc(dec) + "</button>";
     } else {
       list.forEach(e => body.appendChild(renderEntry(e, urlMap)));
     }
     section.appendChild(body);
-    main.appendChild(section);
+
+    if (list.length) {
+      gap = null;
+      main.appendChild(section);
+      return;
+    }
+    if (!gap) {
+      gap = makeGap(dec);
+      main.appendChild(gap);
+    }
+    gap.querySelector(".gap-body").appendChild(section);
+    gap.dataset.last = dec;
+    const label = gap.dataset.dec === dec ? dec : gap.dataset.dec + " \u2013 " + dec;
+    gap.querySelector(".gap-label").textContent = label;
+    if (openDecades.has(dec)) setGapOpen(gap, true);
   });
 
   buildDecadeNav(byDecade);
 
-  if (firstRender) {
-    firstRender = false;
-    // Open on the first decade that has memories instead of an empty 1930s.
-    const first = decadesFor(byDecade).find(d => byDecade[d]);
-    if (first && isHorizontal()) {
-      main.scrollLeft = document.getElementById("dec-" + first).offsetLeft - main.offsetLeft - 16;
-    }
-  } else {
-    main.scrollLeft = keepX;
-  }
+  // Empty decades before the first memory are already folded into one narrow
+  // row, so the first render starts at the left; refreshes keep their place.
+  if (firstRender) firstRender = false;
+  else main.scrollLeft = keepX;
   updateActiveNav();
+}
+
+// Decades the reader has unfolded; kept across live-sync re-renders.
+const openDecades = new Set();
+
+function makeGap(firstDec) {
+  const gap = document.createElement("section");
+  gap.className = "decade-gap";
+  gap.dataset.dec = firstDec;
+  gap.innerHTML =
+    '<button class="gap-toggle" aria-expanded="false">' +
+      '<span class="gap-label"></span>' +
+      '<span class="gap-note">No memories yet</span>' +
+      '<span class="gap-chevron" aria-hidden="true">&#9662;</span>' +
+    "</button>" +
+    '<div class="gap-body"></div>';
+  gap.querySelector(".gap-toggle").onclick = () => {
+    setGapOpen(gap, !gap.classList.contains("open"));
+    updateActiveNav();
+  };
+  return gap;
+}
+
+function setGapOpen(gap, open) {
+  gap.classList.toggle("open", open);
+  gap.querySelector(".gap-toggle").setAttribute("aria-expanded", String(open));
+  gap.querySelectorAll(".decade").forEach(s =>
+    open ? openDecades.add(s.dataset.dec) : openDecades.delete(s.dataset.dec));
 }
 
 function renderEntry(e, urlMap) {
@@ -390,8 +432,10 @@ function buildDecadeNav(byDecade) {
     b.className = n ? "has-entries" : "";
     b.innerHTML = esc(dec) + (n ? ' <span class="nav-count">' + n + "</span>" : "");
     b.onclick = () => {
-      const el = document.getElementById("dec-" + dec);
+      let el = document.getElementById("dec-" + dec);
       if (!el) return;
+      const gap = el.closest(".decade-gap");
+      if (gap && !gap.classList.contains("open")) setGapOpen(gap, true);
       if (isHorizontal()) {
         el.scrollIntoView({ behavior: "smooth", inline: "start", block: "nearest" });
       } else {
@@ -400,6 +444,9 @@ function buildDecadeNav(byDecade) {
         window.scrollTo({ top: window.scrollY + el.getBoundingClientRect().top - offset, behavior: "smooth" });
       }
       setActiveNav(dec);
+      // Let the smooth scroll finish before scroll tracking takes over again
+      // (near the end of the page it can't bring the decade all the way up).
+      navLockUntil = Date.now() + 1200;
     };
     nav.appendChild(b);
   });
@@ -416,9 +463,16 @@ function setActiveNav(dec) {
   });
 }
 
+let navLockUntil = 0;
+
 // Highlight the decade currently in view as the reader scrolls.
 function updateActiveNav() {
-  const sections = [...document.querySelectorAll("#timeline .decade")];
+  if (Date.now() < navLockUntil) return;
+  // Visible decade columns, plus folded gaps (which stand in for their decades).
+  const sections = [...document.querySelectorAll("#timeline .decade, #timeline .decade-gap")]
+    .filter(el => el.classList.contains("decade-gap")
+      ? !el.classList.contains("open")
+      : !el.closest(".decade-gap:not(.open)"));
   if (!sections.length) return;
   let current = sections[0];
   if (isHorizontal()) {
@@ -428,7 +482,7 @@ function updateActiveNav() {
     const top = document.getElementById("decadeNav").getBoundingClientRect().bottom + 40;
     for (const s of sections) if (s.getBoundingClientRect().bottom > top) { current = s; break; }
   }
-  const dec = current.id.slice(4);
+  const dec = current.dataset.dec;
   const active = document.querySelector("#decadeNav button.active");
   if (!active || active.dataset.dec !== dec) setActiveNav(dec);
 }
@@ -745,6 +799,14 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Photo viewer: tap (or Enter on) any timeline photo to see it full size.
   const timelineEl = document.getElementById("timeline");
+  // "+ Add one from the 1970s" inside an unfolded empty decade.
+  timelineEl.addEventListener("click", (e) => {
+    const btn = e.target.closest(".add-here");
+    if (!btn) return;
+    openModal();
+    document.getElementById("fDate").value = "";
+    document.getElementById("fDecade").value = btn.dataset.dec;
+  });
   timelineEl.addEventListener("click", (e) => {
     if (e.target.matches(".entry-photos img")) openLightbox(e.target);
   });
