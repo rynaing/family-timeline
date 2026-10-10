@@ -8,7 +8,32 @@
 const SUPABASE_URL = "https://ukrxoqsvyvlyeblubjeo.supabase.co";
 const SUPABASE_KEY = "sb_publishable_hXr3XBpmRYSDiJNiOzt6yw_DttyIY6y";
 
-const DECADES = ["1930s","1940s","1950s","1960s","1970s","1980s","1990s","2000s","2010s","2020s"];
+// The timeline always shows 1930s → this decade, and reaches further back
+// (as far as the 1800s) only when a family has memories that old.
+const FIRST_DECADE = 1930;
+const EARLIEST_DECADE = 1800;
+const THIS_DECADE = Math.floor(new Date().getFullYear() / 10) * 10;
+
+function decadeRange(from, to) {
+  const out = [];
+  for (let y = from; y <= to; y += 10) out.push(y + "s");
+  return out;
+}
+
+// Decade columns for a set of entries grouped by decade label.
+function decadesFor(byDecade) {
+  let start = FIRST_DECADE;
+  Object.keys(byDecade || {}).forEach(k => {
+    const y = parseInt(k, 10);
+    if (!isNaN(y) && y < start) start = y;
+  });
+  const list = decadeRange(start, THIS_DECADE);
+  // Anything unexpected (e.g. a far-future date) still gets a column.
+  Object.keys(byDecade || {}).forEach(k => {
+    if (k !== "Timeless" && !list.includes(k)) list.push(k);
+  });
+  return byDecade && byDecade["Timeless"] ? [...list, "Timeless"] : list;
+}
 const LS_FAMILY = "ft_family";   // { id, name }
 const LS_THEME  = "ft_theme";
 const LS_NAME   = "ft_name";     // "Your name" on the add form, remembered per device
@@ -272,7 +297,7 @@ function renderTimeline(entries, urlMap) {
     (byDecade[d] = byDecade[d] || []).push(e);
   });
 
-  [...DECADES, ...(byDecade["Timeless"] ? ["Timeless"] : [])].forEach(dec => {
+  decadesFor(byDecade).forEach(dec => {
     const section = document.createElement("section");
     section.className = "decade" + ((byDecade[dec] || []).length ? "" : " is-empty");
     section.id = "dec-" + dec;
@@ -294,7 +319,7 @@ function renderTimeline(entries, urlMap) {
   if (firstRender) {
     firstRender = false;
     // Open on the first decade that has memories instead of an empty 1930s.
-    const first = DECADES.concat("Timeless").find(d => byDecade[d]);
+    const first = decadesFor(byDecade).find(d => byDecade[d]);
     if (first && isHorizontal()) {
       main.scrollLeft = document.getElementById("dec-" + first).offsetLeft - main.offsetLeft - 16;
     }
@@ -357,7 +382,7 @@ function buildDecadeNav(byDecade) {
   byDecade = byDecade || {};
   const nav = document.getElementById("decadeNav");
   nav.innerHTML = "";
-  const labels = byDecade["Timeless"] ? [...DECADES, "Timeless"] : DECADES;
+  const labels = decadesFor(byDecade);
   labels.forEach(dec => {
     const b = document.createElement("button");
     const n = (byDecade[dec] || []).length;
@@ -789,6 +814,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Exact date and "roughly when" are either/or: picking one clears the other.
   const fDate = document.getElementById("fDate"), fDecade = document.getElementById("fDecade");
+  // Newest first, so recent decades are near the top and the 1800s are a scroll away.
+  decadeRange(EARLIEST_DECADE, THIS_DECADE).reverse().forEach(d => fDecade.add(new Option(d, d)));
+  fDate.max = new Date().toISOString().slice(0, 10);
   fDate.addEventListener("change", () => { if (fDate.value) fDecade.value = ""; });
   fDecade.addEventListener("change", () => { if (fDecade.value) fDate.value = ""; });
 

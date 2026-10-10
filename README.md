@@ -6,7 +6,7 @@ devices, photo uploads to private storage.
 
 ## What's in the page
 
-- Horizontal decade scroll (1930s → today), teal-and-coral theme, dark mode
+- Horizontal decade scroll (1930s → today, reaching back to the 1800s when a family has older memories), teal-and-coral theme, dark mode
 - Room-code join (`join_family` RPC); family remembered on the device
 - Every request carries the `x-family-id` header — the database only ever
   returns the joined family's own rows (the Jackbox rule)
