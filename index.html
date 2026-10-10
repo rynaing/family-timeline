@@ -23,7 +23,9 @@
 
   <header class="topbar">
     <div class="brand">
-      <img src="favicon.svg" class="brand-logo" alt="" width="32" height="32" />
+      <button id="homeBtn" class="home-btn" title="Kintime home page">
+        <img src="favicon.svg" class="brand-logo" alt="" width="32" height="32" />
+      </button>
       <div>
         <h1>Kintime</h1>
         <p id="familyName" class="family-name"></p>
@@ -39,6 +41,7 @@
   </header>
 
   <div id="menu" class="menu hidden">
+    <button id="menuHomeBtn">Kintime home page</button>
     <button id="exportBtn">Download a backup (JSON)</button>
     <button id="menuThemeBtn" class="menu-phone-only">Dark mode on/off</button>
     <button id="switchFamilyBtn">Switch family</button>
@@ -66,19 +69,78 @@
   </div>
 
 
-  <!-- Room-code join overlay -->
-  <div id="joinOverlay" class="overlay hidden">
-    <div class="card join-card">
-      <h2>Enter your family room code</h2>
-      <p class="muted">Each family has its own code. You'll only ever see your own family's history.</p>
+  <!-- Landing page (shown until you join a family) -->
+  <div id="joinOverlay" class="landing hidden">
+    <div class="landing-glow" aria-hidden="true"><span></span><span></span><span></span></div>
+
+    <header class="landing-top">
+      <span class="brand">
+        <img src="favicon.svg" class="brand-logo" alt="" width="32" height="32" />
+        <strong>Kintime</strong>
+      </span>
+      <a href="#join" id="landingCodeLink" class="btn btn-small landing-code-link">I have a room code</a>
+      <button id="landingBackBtn" class="btn btn-small btn-primary hidden"></button>
+    </header>
+
+    <section class="hero">
+      <div class="hero-copy">
+        <span class="early-badge reveal" style="--d:0s">Early access &middot; free for now</span>
+        <h2 class="hero-title">
+          <span class="reveal" style="--d:.12s">Every family has a story.</span>
+          <span class="reveal hero-grad" style="--d:.32s">Preserve yours.</span>
+        </h2>
+        <p class="hero-sub reveal" style="--d:.55s">Kintime gathers your family&rsquo;s memories and photos, decade by decade, in one private place the whole family can add to.</p>
+        <div class="hero-ctas reveal" style="--d:.75s">
+          <button id="createFamilyBtn" class="btn btn-primary btn-lg">Start your family&rsquo;s timeline</button>
+          <button id="demoBtn" class="btn btn-lg">See a demo family</button>
+        </div>
+        <p class="hero-fine reveal" style="--d:.9s">Free while in early access &middot; no ads &middot; no cookies</p>
+      </div>
+      <div class="hero-phone reveal-phone">
+        <div class="phone">
+          <video id="introVideo" muted loop playsinline preload="auto" poster="media/intro-poster.jpg"
+                 aria-label="Short video: a family is created, a memory with a photo is added, relatives add theirs, and the whole timeline scrolls by decade">
+            <source src="media/intro.mp4" type="video/mp4" />
+            <source src="media/intro.webm" type="video/webm" />
+          </video>
+        </div>
+      </div>
+    </section>
+
+    <div class="decade-ribbon" aria-hidden="true">
+      <div class="ribbon-track">
+        <span>1930s</span><span>1940s</span><span>1950s</span><span>1960s</span><span>1970s</span><span>1980s</span><span>1990s</span><span>2000s</span><span>2010s</span><span>2020s</span>
+        <span>1930s</span><span>1940s</span><span>1950s</span><span>1960s</span><span>1970s</span><span>1980s</span><span>1990s</span><span>2000s</span><span>2010s</span><span>2020s</span>
+      </div>
+    </div>
+
+    <section class="features">
+      <div class="feature">
+        <span class="feature-icon" aria-hidden="true">&#9998;</span>
+        <h3>Add a memory in seconds</h3>
+        <p>A title, a date, a story and a photo. Don&rsquo;t know the year? Just pick the decade.</p>
+      </div>
+      <div class="feature">
+        <span class="feature-icon" aria-hidden="true">&#10084;</span>
+        <h3>The whole family pitches in</h3>
+        <p>Share one room code. Grandparents, cousins and kids add what they remember, and it shows up for everyone.</p>
+      </div>
+      <div class="feature">
+        <span class="feature-icon" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><rect x="5" y="11" width="14" height="10" rx="2" fill="currentColor"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg></span>
+        <h3>Private by default</h3>
+        <p>Only people with your code can see it. Friends links show titles and dates, never stories or photos.</p>
+      </div>
+    </section>
+
+    <section id="join" class="card join-card">
+      <h2>Already have a room code?</h2>
+      <p class="muted">Each family has its own code. You&rsquo;ll only ever see your own family&rsquo;s history.</p>
       <input id="roomCodeInput" type="text" placeholder="e.g. eb08-7358" autocomplete="off" autocapitalize="none" spellcheck="false" />
       <p id="joinError" class="error hidden">That code didn't match a family &mdash; try again.</p>
       <button id="joinBtn" class="btn btn-primary btn-block">Join timeline</button>
-      <div class="divider"><span>or</span></div>
-      <button id="createFamilyBtn" class="btn btn-block">Add your family</button>
-      <button id="demoBtn" class="link-btn demo-link">Just looking? View the demo family</button>
-      <p class="join-footer"><a href="privacy.html">Privacy</a> &middot; no cookies, no ads</p>
-    </div>
+    </section>
+
+    <p class="join-footer"><a href="privacy.html">Privacy</a> &middot; <a href="mailto:hello@kintime.app">hello@kintime.app</a> &middot; no cookies, no ads</p>
   </div>
 
   <!-- Create family modal -->
@@ -112,6 +174,7 @@
       <div id="createStep1">
         <h2>Add your family</h2>
         <p class="muted">Start a private timeline just for your family. You'll get a room code to share with them.</p>
+        <p class="early-note">Kintime is in early access and free while we build it.</p>
         <label>Family name
           <input id="newFamilyName" type="text" maxlength="80" placeholder="e.g. The Rivera Family" autocomplete="off" />
         </label>
