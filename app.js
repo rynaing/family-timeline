@@ -132,14 +132,21 @@ const DEMO_FAMILY_ID = "68acff0f-b6ec-4e98-9e1f-e8d1c0661a26";
 const DEMO_FAMILY_NAME = "The Harrison Family";
 let demoMode = false;
 
+// The demo isn't remembered on the device, so a refresh never lands someone in it.
 function joinDemo() {
   const fam = { id: DEMO_FAMILY_ID, name: DEMO_FAMILY_NAME };
-  localStorage.setItem(LS_FAMILY, JSON.stringify(fam));
   enterFamily(fam);
   track("demo_opened");
 }
 
 /* ---------------- landing page ---------------- */
+
+// Set while someone is on the home page from inside a family, so a refresh
+// keeps them on the home page instead of dropping them back into the family.
+const SS_HOME = "ft_on_home";
+function setOnHome(on) {
+  try { on ? sessionStorage.setItem(SS_HOME, "1") : sessionStorage.removeItem(SS_HOME); } catch {}
+}
 
 // The intro video only plays while the landing page is showing, and not at
 // all for people who've asked their device for reduced motion.
@@ -152,6 +159,7 @@ function showLanding() {
   back.textContent = familyId ? "Back to " + familyName : "";
   back.classList.toggle("hidden", !familyId);
   document.getElementById("landingCodeLink").classList.toggle("hidden", !!familyId);
+  setOnHome(!!familyId);
   const v = document.getElementById("introVideo");
   if (matchMedia("(prefers-reduced-motion: reduce)").matches) {
     v.controls = true;
@@ -160,6 +168,7 @@ function showLanding() {
   }
 }
 function hideLanding() {
+  setOnHome(false);
   document.getElementById("joinOverlay").classList.add("hidden");
   document.getElementById("introVideo").pause();
 }
@@ -212,8 +221,13 @@ function enterFamily(fam) {
 function silentRejoin() {
   try {
     const fam = JSON.parse(localStorage.getItem(LS_FAMILY) || "null");
+    // Older versions remembered the demo; forget it so visitors see the home page.
+    if (fam && fam.id === DEMO_FAMILY_ID) { localStorage.removeItem(LS_FAMILY); return false; }
     if (fam && fam.id) {
+      let onHome = false;
+      try { onHome = sessionStorage.getItem(SS_HOME) === "1"; } catch {}
       enterFamily(fam);
+      if (onHome) { showLanding(); return true; }
       const wb = document.getElementById("welcomeBack");
       document.getElementById("welcomeBackText").textContent =
         "Welcome back to " + fam.name + " \u2014";
@@ -227,7 +241,8 @@ function silentRejoin() {
 
 function switchFamily() {
   if (rtChannel) { db.removeChannel(rtChannel); rtChannel = null; }
-  localStorage.removeItem(LS_FAMILY);
+  // Leaving the demo shouldn't forget the real family saved on this device.
+  if (!demoMode) localStorage.removeItem(LS_FAMILY);
   familyId = null; db = null;
   familyName = "";
   firstRender = true;
@@ -900,6 +915,8 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("homeBtn").onclick = showLanding;
   document.getElementById("menuHomeBtn").onclick = () => { menu.classList.add("hidden"); showLanding(); };
   document.getElementById("landingBackBtn").onclick = hideLanding;
+  document.getElementById("landingCodeLink").addEventListener("click", () =>
+    setTimeout(() => document.getElementById("roomCodeInput").focus({ preventScroll: true }), 400));
   document.getElementById("switchFamilyBtn").onclick = () => { menu.classList.add("hidden"); switchFamily(); };
   document.getElementById("welcomeSwitch").onclick = switchFamily;
 
