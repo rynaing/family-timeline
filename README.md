@@ -1,30 +1,30 @@
 # Kintime — family timeline website (kintime.app)
 
 The public website for the family timeline. It talks to the Supabase backend
-at runtime: room-code join, per-family data isolation, live sync between
+at runtime: family-code join, per-family data isolation, live sync between
 devices, photo uploads to private storage.
 
 ## What's in the page
 
 - Horizontal decade scroll (1930s → today, reaching back to the 1800s when a family has older memories), "Sunrise" theme (violet, sunset pink and warm orange on cream), dark mode
-- Landing page for new visitors: animated hero, a looping product video (`media/intro.mp4`, filmed with a fictional family by `tools/intro-video/`), feature cards and the room-code form. The video pauses once you join and never autoplays with reduced motion on
-- Room-code join (`join_family` RPC); family remembered on the device
+- Landing page for new visitors: animated hero, a looping product video (`media/intro.mp4`, filmed with a fictional family by `tools/intro-video/`), feature cards and the family-code form. The video pauses once you join and never autoplays with reduced motion on
+- Family-code join (`join_family` RPC); family remembered on the device
 - Every request carries the `x-family-id` header — the database only ever
   returns the joined family's own rows (the Jackbox rule)
 - New entries land as **pending** ("Not reviewed yet" badge) via a DB trigger
 - Live sync via a private per-family broadcast channel (no row data in the
   pings; the channel name is the family's unguessable UUID)
 - Photo uploads to the private `family-photos` bucket, shown via signed URLs
-- Download a backup of the timeline text as JSON (menu). Import was removed: it skipped photos and let anyone with the room code bulk-add entries
+- Download a backup of the timeline text as JSON (menu). Import was removed: it skipped photos and let anyone with the family code bulk-add entries
 - Runs of empty decades fold into one accordion row ("1930s – 1950s") that opens to "+ Add one from the 1940s"; decade chips show memory counts and follow the scroll
 - "Roughly when" decade picker for memories without an exact date
 - Photos are shrunk to 2000px JPEG in the browser before upload; tap a photo to view it full size
 - Link previews (`og.png`), favicon and home-screen icon
-- Plain-language privacy page (`privacy.html`), linked from the menu and the room-code screen
+- Plain-language privacy page (`privacy.html`), linked from the menu and the family-code screen
 - Privacy (eye) mode hides stories and photos for shoulder-surfers
 - `*` marks fields that still need confirmation
 - **Share** button: a friends link (`?share=<token>`, events and dates only, read-only, no
-  access code) and a family link (`?join=<room code>`, the full timeline). "Stop old friends
+  access code) and a family link (`?join=<family code>`, the full timeline). "Stop old friends
   links" makes a new token. Database side: `supabase/share_links.sql`
 
 ## Analytics
@@ -54,7 +54,7 @@ devices, photo uploads to private storage.
 
 ## Test checklist
 
-- [ ] Join with the room code on two devices — both see the same entries
+- [ ] Join with the family code on two devices — both see the same entries
 - [ ] Add an entry on one device — it appears on the other as "Not reviewed yet"
 - [ ] Upload a photo — it renders on the other device
 - [ ] Wrong code shows an error; switching family clears the session

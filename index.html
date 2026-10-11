@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Kintime &middot; your family's timeline</title>
   <meta name="robots" content="noindex, nofollow" />
-  <meta name="description" content="A private timeline of your family's stories and photos, decade by decade. Join with your family's room code." />
+  <meta name="description" content="A private timeline of your family's stories and photos, decade by decade. Join with your family code." />
   <meta name="theme-color" content="#7c3aed" />
   <link rel="icon" href="favicon.svg" type="image/svg+xml" />
   <link rel="apple-touch-icon" href="apple-touch-icon.png" />
@@ -78,7 +78,7 @@
         <img src="favicon.svg" class="brand-logo" alt="" width="32" height="32" />
         <strong>Kintime</strong>
       </span>
-      <a href="#join" id="landingCodeLink" class="btn btn-small landing-code-link">I have a room code</a>
+      <a href="#join" id="landingCodeLink" class="btn btn-small landing-code-link">I have a family code</a>
       <button id="landingBackBtn" class="btn btn-small btn-primary hidden"></button>
     </header>
 
@@ -123,7 +123,7 @@
       <div class="feature">
         <span class="feature-icon" aria-hidden="true">&#10084;</span>
         <h3>The whole family pitches in</h3>
-        <p>Share one room code. Grandparents, cousins and kids add what they remember, and it shows up for everyone.</p>
+        <p>Share one family code. Grandparents, cousins and kids add what they remember, and it shows up for everyone.</p>
       </div>
       <div class="feature">
         <span class="feature-icon" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><rect x="5" y="11" width="14" height="10" rx="2" fill="currentColor"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg></span>
@@ -133,7 +133,7 @@
     </section>
 
     <section id="join" class="card join-card">
-      <h2>Already have a room code?</h2>
+      <h2>Already have a family code?</h2>
       <p class="muted">Each family has its own code. You&rsquo;ll only ever see your own family&rsquo;s history.</p>
       <input id="roomCodeInput" type="text" placeholder="e.g. eb08-7358" autocomplete="off" autocapitalize="none" spellcheck="false" />
       <p id="joinError" class="error hidden">That code didn't match a family &mdash; try again.</p>
@@ -173,7 +173,7 @@
     <div class="card modal-card">
       <div id="createStep1">
         <h2>Add your family</h2>
-        <p class="muted">Start a private timeline just for your family. You'll get a room code to share with them.</p>
+        <p class="muted">Start a private timeline just for your family. You'll get a family code to share with them.</p>
         <p class="early-note">Kintime is in early access and free while we build it.</p>
         <label>Family name
           <input id="newFamilyName" type="text" maxlength="80" placeholder="e.g. The Rivera Family" autocomplete="off" />
@@ -186,9 +186,9 @@
       </div>
       <div id="createStep2" class="hidden">
         <h2>Your family is ready</h2>
-        <p class="muted">Share the room code with your family so they can join.</p>
+        <p class="muted">Share this code with your family so they can join.</p>
         <div class="secret-box">
-          <span class="secret-label">Room code</span>
+          <span class="secret-label">Family code</span>
           <div class="secret-row">
             <code id="newRoomCode"></code>
             <button id="copyCodeBtn" class="btn btn-small">Copy</button>
