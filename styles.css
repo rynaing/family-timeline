@@ -669,14 +669,30 @@ body.share-view #addEntryBtn, body.share-view #shareBtn, body.share-view #eyeBtn
   font-size: 1.2rem;
 }
 
-.landing .join-card { margin: 1.5rem auto 0; max-height: none; scroll-margin: 2rem; }
-.landing .join-card h2 { font-size: 1.25rem; }
+/* Family code box, right under the main buttons so returning family don't have to scroll. */
+.hero-join { margin-top: 1.4rem; max-width: 30rem; scroll-margin: 6rem; }
+.hero-join label { display: block; font-size: 0.9rem; font-weight: 600; margin-bottom: 0.4rem; }
+.hero-join-row { display: flex; gap: 0.5rem; }
+.hero-join input {
+  flex: 1;
+  min-width: 0;
+  padding: 0.7rem 0.9rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 16px;   /* no iOS zoom */
+}
+.hero-join input:focus { outline: 2px solid var(--primary); outline-offset: 1px; }
+.hero-join .btn { padding: 0.7rem 1.3rem; font-weight: 600; font-size: 1rem; }
+.hero-join .error { margin: 0.5rem 0 0; }
 .landing .join-footer { padding: 0 1rem 2.5rem; margin-top: 1.5rem; }
 
 @media (max-width: 860px) {
   .hero { grid-template-columns: 1fr; gap: 2rem; padding-top: 1rem; text-align: center; }
   .hero-sub { margin-inline: auto; }
   .hero-ctas { justify-content: center; }
+  .hero-join { margin-inline: auto; text-align: left; }
   .phone { width: 250px; border-width: 8px; border-radius: 36px; transform: none; }
   .features { grid-template-columns: 1fr; padding-top: 2rem; }
 }
@@ -693,10 +709,10 @@ body.share-view #addEntryBtn, body.share-view #shareBtn, body.share-view #eyeBtn
   .phone { transform: none; transition: none; }
 }
 .landing { scroll-behavior: smooth; }
-.landing .join-card { width: calc(100% - 2.5rem); }
 
 /* The logo in the top bar goes to the home page (the family stays remembered). */
 .home-btn { background: none; border: none; padding: 0; cursor: pointer; display: flex; border-radius: 9px; }
 .home-btn:hover .brand-logo { transform: scale(1.06); }
 .home-btn .brand-logo { transition: transform 0.15s; }
 #landingBackBtn { max-width: 60vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hero > * { min-width: 0; }

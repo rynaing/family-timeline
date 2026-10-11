@@ -94,6 +94,14 @@
           <button id="createFamilyBtn" class="btn btn-primary btn-lg">Start your family&rsquo;s timeline</button>
           <button id="demoBtn" class="btn btn-lg">See a demo family</button>
         </div>
+        <div id="join" class="hero-join reveal" style="--d:.85s">
+          <label for="roomCodeInput">Already have a family code?</label>
+          <div class="hero-join-row">
+            <input id="roomCodeInput" type="text" placeholder="e.g. eb08-7358" autocomplete="off" autocapitalize="none" spellcheck="false" />
+            <button id="joinBtn" class="btn">Join</button>
+          </div>
+          <p id="joinError" class="error hidden">That code didn't match a family &mdash; try again.</p>
+        </div>
         <p class="hero-fine reveal" style="--d:.9s">Free while in early access &middot; no ads &middot; no cookies</p>
       </div>
       <div class="hero-phone reveal-phone">
@@ -130,14 +138,6 @@
         <h3>Private by default</h3>
         <p>Only people with your code can see it. Friends links show titles and dates, never stories or photos.</p>
       </div>
-    </section>
-
-    <section id="join" class="card join-card">
-      <h2>Already have a family code?</h2>
-      <p class="muted">Each family has its own code. You&rsquo;ll only ever see your own family&rsquo;s history.</p>
-      <input id="roomCodeInput" type="text" placeholder="e.g. eb08-7358" autocomplete="off" autocapitalize="none" spellcheck="false" />
-      <p id="joinError" class="error hidden">That code didn't match a family &mdash; try again.</p>
-      <button id="joinBtn" class="btn btn-primary btn-block">Join timeline</button>
     </section>
 
     <p class="join-footer"><a href="privacy.html">Privacy</a> &middot; <a href="mailto:hello@kintime.app">hello@kintime.app</a> &middot; no cookies, no ads</p>

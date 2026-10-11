@@ -900,6 +900,8 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("homeBtn").onclick = showLanding;
   document.getElementById("menuHomeBtn").onclick = () => { menu.classList.add("hidden"); showLanding(); };
   document.getElementById("landingBackBtn").onclick = hideLanding;
+  document.getElementById("landingCodeLink").addEventListener("click", () =>
+    setTimeout(() => document.getElementById("roomCodeInput").focus({ preventScroll: true }), 400));
   document.getElementById("switchFamilyBtn").onclick = () => { menu.classList.add("hidden"); switchFamily(); };
   document.getElementById("welcomeSwitch").onclick = switchFamily;
 
