@@ -30,8 +30,16 @@
   window.supabase = { createClient() { return {
     from: q,
     rpc(name) {
+      if (name === "create_family_owned") return new Promise(r => setTimeout(() => r({ data: [{ family_id: FAM, family_name: "The Riveras", invite_code: "rvra-1958" }], error: null }), 500));
       if (name === "create_family") return new Promise(r => setTimeout(() => r({ data: [{ family_id: FAM, family_name: "The Riveras", invite_code: "rvra-1958", owner_secret: "k7Qp-2vXe-9LmA-c4Rt-Hn8s" }], error: null }), 500));
       return Promise.resolve({ data: null, error: null });
+    },
+    auth: {
+      signInWithOtp() { return new Promise(r => setTimeout(() => r({ error: null }), 400)); },
+      verifyOtp({ email }) { const session = { access_token: "t", user: { email } }; return Promise.resolve({ data: { session, user: session.user }, error: null }); },
+      getSession() { return Promise.resolve({ data: { session: null } }); },
+      onAuthStateChange() { return { data: { subscription: { unsubscribe() {} } } }; },
+      signOut() { return Promise.resolve({ error: null }); },
     },
     storage: { from() { return {
       createSignedUrl(path) { return Promise.resolve({ data: { signedUrl: photoUrl[path] } }); },

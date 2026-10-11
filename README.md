@@ -39,8 +39,23 @@ devices, photo uploads to private storage.
 
 - `app.js` contains the Supabase URL and the **publishable** key. This is
   public by design — it can only do what row-level security allows.
-- The **owner secret** is never in this repo. Admin approve/reject lives on
-  a separate private page (not yet built).
+- Family owners sign in with a one-time code emailed by Supabase Auth
+  (`supabase/owner_email.sql`). Signed in, they get Approve and Remove on each memory;
+  the database checks `is_family_owner()` either way. Families made before this can be
+  claimed once with their old owner key. Everyone else only ever needs the family code.
+
+## Owner email codes: Supabase setup
+
+1. **Authentication → Sign In / Providers → Email**: email sign-in on.
+2. **Authentication → Emails → SMTP**: add a custom sender (e.g. Resend, with
+   kintime.app verified). Supabase's built-in sender only delivers to your own team's
+   addresses and a couple of emails an hour, so real families won't get codes without it.
+3. **Authentication → Emails → Templates**: in both "Magic link" and "Confirm signup",
+   show the code, e.g. `<p>Your Kintime code is <strong>{{ .Token }}</strong></p>`.
+   This project is shared with another app, so keep the existing link in those
+   templates as well.
+4. Run `supabase/owner_email.sql` (it also stops anonymous family creation, so deploy
+   the matching `app.js` at the same time).
 
 ## Deploy to GitHub Pages
 
