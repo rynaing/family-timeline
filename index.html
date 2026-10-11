@@ -44,6 +44,7 @@
     <button id="menuHomeBtn">Kintime home page</button>
     <button id="exportBtn">Download a backup (JSON)</button>
     <button id="menuThemeBtn" class="menu-phone-only">Dark mode on/off</button>
+    <button id="ownerBtn" class="hide-in-demo">Owner sign-in</button>
     <button id="switchFamilyBtn">Switch family</button>
     <a href="privacy.html" class="menu-link">Privacy</a>
   </div>
@@ -178,10 +179,25 @@
         <label>Family name
           <input id="newFamilyName" type="text" maxlength="80" placeholder="e.g. The Rivera Family" autocomplete="off" />
         </label>
+        <label>Your email
+          <input id="newOwnerEmail" type="email" maxlength="200" placeholder="you@example.com" autocomplete="email" />
+        </label>
+        <p class="muted small">You'll be the family's owner. We'll email you a code now, and again whenever you sign in to approve or remove memories. No password.</p>
         <p id="createError" class="error hidden"></p>
         <div class="row">
           <button id="createBackBtn" class="btn">Back</button>
-          <button id="createGoBtn" class="btn btn-primary">Create family</button>
+          <button id="createGoBtn" class="btn btn-primary">Send code</button>
+        </div>
+      </div>
+      <div id="createStepCode" class="hidden">
+        <h2>Check your email</h2>
+        <p class="muted">Enter the code we sent to <strong id="createCodeEmail"></strong>.</p>
+        <input id="createCodeInput" class="code-input" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="10" placeholder="123456" />
+        <p id="createCodeError" class="error hidden"></p>
+        <button id="createResendBtn" class="link-btn">Send a new code</button>
+        <div class="row">
+          <button id="createCodeBackBtn" class="btn">Back</button>
+          <button id="createVerifyBtn" class="btn btn-primary">Create family</button>
         </div>
       </div>
       <div id="createStep2" class="hidden">
@@ -194,15 +210,47 @@
             <button id="copyCodeBtn" class="btn btn-small">Copy</button>
           </div>
         </div>
-        <div class="secret-box">
-          <span class="secret-label">Owner key</span>
-          <div class="secret-row">
-            <code id="newOwnerSecret" class="secret-truncate"></code>
-            <button id="copySecretBtn" class="btn btn-small">Copy</button>
-          </div>
-        </div>
-        <p class="warning">Save your owner key somewhere safe. It's the only way to approve new entries, and it can't be recovered if lost.</p>
+        <p class="muted small">You're the owner. To approve or remove memories, choose &ldquo;Owner sign-in&rdquo; in the menu and we'll email <strong id="newOwnerEmailShown"></strong> a code.</p>
         <button id="enterTimelineBtn" class="btn btn-primary btn-block">Enter timeline</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Owner sign-in: emailed one-time code -->
+  <div id="ownerOverlay" class="overlay hidden">
+    <div class="card modal-card">
+      <div id="ownerStepEmail">
+        <h2>Owner sign-in</h2>
+        <p class="muted">The family's owner can approve and remove memories. We'll email you a code, no password needed.</p>
+        <label>Your email
+          <input id="ownerEmail" type="email" maxlength="200" placeholder="you@example.com" autocomplete="email" />
+        </label>
+        <p id="ownerEmailError" class="error hidden"></p>
+        <div class="row">
+          <button id="ownerCancelBtn" class="btn">Cancel</button>
+          <button id="ownerSendBtn" class="btn btn-primary">Send code</button>
+        </div>
+      </div>
+      <div id="ownerStepCode" class="hidden">
+        <h2>Check your email</h2>
+        <p class="muted">Enter the code we sent to <strong id="ownerCodeEmail"></strong>.</p>
+        <input id="ownerCodeInput" class="code-input" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="10" placeholder="123456" />
+        <p id="ownerCodeError" class="error hidden"></p>
+        <button id="ownerResendBtn" class="link-btn">Send a new code</button>
+        <div class="row">
+          <button id="ownerCodeBackBtn" class="btn">Back</button>
+          <button id="ownerVerifyBtn" class="btn btn-primary">Sign in</button>
+        </div>
+      </div>
+      <div id="ownerStepClaim" class="hidden">
+        <h2>Claim this family</h2>
+        <p class="muted">This family was set up before email sign-in. Paste its old owner key once, and from now on you'll just sign in with your email.</p>
+        <input id="ownerClaimInput" type="text" autocomplete="off" spellcheck="false" placeholder="Owner key" />
+        <p id="ownerClaimError" class="error hidden"></p>
+        <div class="row">
+          <button id="ownerClaimCancelBtn" class="btn">Not now</button>
+          <button id="ownerClaimBtn" class="btn btn-primary">Claim family</button>
+        </div>
       </div>
     </div>
   </div>

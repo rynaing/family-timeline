@@ -5,8 +5,8 @@
  * what the database's row-level security allows: read/write the joined
  * family's own rows. There is no secret here.
  */
-const SUPABASE_URL = "https://ukrxoqsvyvlyeblubjeo.supabase.co";
-const SUPABASE_KEY = "sb_publishable_hXr3XBpmRYSDiJNiOzt6yw_DttyIY6y";
+const SUPABASE_URL = "https://wwnukictcnmhnuinsfpd.supabase.co";
+const SUPABASE_KEY = "sb_publishable_I22ycyv0ubXR1tKWw6rNAQ_ViniEnXl";
 
 // The timeline always shows 1930s → this decade, and reaches further back
 // (as far as the 1800s) only when a family has memories that old.
@@ -56,7 +56,7 @@ let rtChannel = null;   // realtime broadcast channel
  *     token below comes from the Cloudflare dashboard; empty turns it off.
  *     It's never loaded on friends links, so their share token isn't sent.
  *  2. track("entry_added") etc. counts actions in our own database
- *     (supabase/analytics.sql): just the action name, family id and time,
+ *     (supabase/schema.sql): just the action name, family id and time,
  *     never titles, stories, names or photos.
  */
 const CF_ANALYTICS_TOKEN = "9fd514ca51264ed99c880b007c965db3";
@@ -122,8 +122,72 @@ function uncertainLabel(f) {
  * which is what the database uses to isolate families (the Jackbox rule). */
 function makeClient(fid) {
   return window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
-    global: { headers: { "x-family-id": fid } },
+    // When the family's owner is signed in, their session rides along so the
+    // database lets them approve and remove memories (is_family_owner).
+    global: { headers: { "x-family-id": fid }, fetch: authedFetch },
+    // The owner's session lives in authClient(); this client never stores one.
+    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false, storageKey: "kt-family" },
   });
+}
+
+/* ---------------- owner sign-in (emailed one-time code) ----------------
+ * Only a family's owner signs in, with a code emailed by Supabase Auth.
+ * Everyone else keeps using just the family code. */
+let _auth = null;
+let authToken = null;   // signed-in owner's access token, if any
+let authEmail = null;
+function authClient() {
+  if (!_auth) {
+    _auth = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    _auth.auth.onAuthStateChange((_ev, session) => {
+      authToken = session ? session.access_token : null;
+      authEmail = session && session.user ? session.user.email : null;
+      updateOwnerMenu();
+    });
+  }
+  return _auth;
+}
+function authedFetch(input, init) {
+  init = init || {};
+  if (authToken) {
+    const h = new Headers(init.headers || {});
+    h.set("Authorization", "Bearer " + authToken);
+    init = Object.assign({}, init, { headers: h });
+  }
+  return fetch(input, init);
+}
+async function sendEmailCode(email) {
+  const { error } = await authClient().auth.signInWithOtp({ email, options: { shouldCreateUser: true } });
+  if (error) throw new Error(/rate|seconds/i.test(error.message)
+    ? "Please wait a minute before asking for another code."
+    : "Couldn\u2019t send the code. Check the email address and try again.");
+}
+async function verifyEmailCode(email, code) {
+  const { data, error } = await authClient().auth.verifyOtp({ email, token: code.replace(/\s/g, ""), type: "email" });
+  if (error || !data || !data.session) throw new Error("That code didn\u2019t work. Check it, or send a new one.");
+  authToken = data.session.access_token;
+  authEmail = data.session.user.email;
+  updateOwnerMenu();
+}
+const looksLikeEmail = (v) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
+
+let isOwner = false;
+let ownerInfo = null;   // { has_owner, is_owner } for the current family
+async function refreshOwner() {
+  isOwner = false; ownerInfo = null;
+  if (db && !demoMode) {
+    try {
+      const { data } = await db.rpc("family_owner_info");
+      ownerInfo = data && data[0] ? data[0] : null;
+      isOwner = !!(ownerInfo && ownerInfo.is_owner);
+    } catch {}
+  }
+  document.body.classList.toggle("owner", isOwner);
+  updateOwnerMenu();
+}
+function updateOwnerMenu() {
+  const b = document.getElementById("ownerBtn");
+  if (b) b.textContent = authEmail ? "Sign out (" + authEmail + ")" : "Owner sign-in";
 }
 
 /* Demo family: a permanent example timeline visitors can browse.
@@ -216,6 +280,7 @@ function enterFamily(fam) {
   buildDecadeNav();
   subscribeLive();
   loadTimeline();
+  refreshOwner();
 }
 
 function silentRejoin() {
@@ -247,7 +312,8 @@ function switchFamily() {
   familyName = "";
   firstRender = true;
   demoMode = false;
-  document.body.classList.remove("demo");
+  isOwner = false;
+  document.body.classList.remove("demo", "owner");
   document.getElementById("familyName").textContent = "";
   document.getElementById("addEntryBtn").style.display = "";
   document.getElementById("shareBtn").style.display = "";
@@ -366,6 +432,7 @@ function isHorizontal() {
 }
 
 function renderTimeline(entries, urlMap) {
+  entriesById = {};
   const main = document.getElementById("timeline");
   // Keep the reader's place when a live-sync refresh re-renders.
   const keepX = main.scrollLeft;
@@ -490,6 +557,14 @@ function renderEntry(e, urlMap) {
   const meta = [];
   if (e.created_by) meta.push("Added by " + e.created_by);
   if (meta.length) html += '<div class="entry-meta">' + esc(meta.join(" \u00b7 ")) + "</div>";
+
+  // Only shown to the signed-in owner (body.owner); the database enforces it too.
+  if (e.id != null) {
+    entriesById[e.id] = e;
+    html += '<div class="owner-actions">' +
+      (e.status === "pending" ? '<button class="btn btn-small" data-act="approve" data-id="' + esc(String(e.id)) + '">Approve</button>' : "") +
+      '<button class="link-btn" data-act="remove" data-id="' + esc(String(e.id)) + '">Remove</button></div>';
+  }
 
   card.innerHTML = html;
   return card;
@@ -751,9 +826,9 @@ let pendingFamily = null;
 
 function openCreate() {
   document.getElementById("createOverlay").classList.remove("hidden");
-  document.getElementById("createStep1").classList.remove("hidden");
-  document.getElementById("createStep2").classList.add("hidden");
+  showCreateStep("createStep1");
   document.getElementById("newFamilyName").value = "";
+  document.getElementById("newOwnerEmail").value = authEmail || "";
   document.getElementById("createError").classList.add("hidden");
   setTimeout(() => document.getElementById("newFamilyName").focus(), 60);
 }
@@ -778,37 +853,179 @@ async function copyToClipboard(text, btn) {
   setTimeout(() => { btn.textContent = orig; }, 1500);
 }
 
+function showCreateStep(id) {
+  ["createStep1", "createStepCode", "createStep2"].forEach(k =>
+    document.getElementById(k).classList.toggle("hidden", k !== id));
+}
+function createErr(id, msg) {
+  const el = document.getElementById(id);
+  el.textContent = msg || "";
+  el.classList.toggle("hidden", !msg);
+}
+
+// Step 1: family name + owner email. Already signed in with that email? Skip the code.
 async function doCreateFamily() {
   const name = document.getElementById("newFamilyName").value.trim();
-  const errEl = document.getElementById("createError");
-  errEl.classList.add("hidden");
-  if (!name) {
-    errEl.textContent = "Give your family a name first.";
-    errEl.classList.remove("hidden");
-    return;
-  }
+  const email = document.getElementById("newOwnerEmail").value.trim().toLowerCase();
+  createErr("createError", "");
+  if (!name) return createErr("createError", "Give your family a name first.");
+  if (!looksLikeEmail(email)) return createErr("createError", "Enter your email so you can manage the family later.");
   const btn = document.getElementById("createGoBtn");
   btn.disabled = true;
-  btn.textContent = "Creating\u2026";
   try {
-    const anon = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-    const { data, error } = await anon.rpc("create_family", { fname: name });
-    if (error || !data || !data.length) {
-      throw new Error((error && error.message) || "Couldn't create the family \u2014 try again.");
-    }
-    const f = data[0];
-    pendingFamily = { id: f.family_id, name: f.family_name };
-    track("family_created");
-    document.getElementById("newRoomCode").textContent = f.invite_code;
-    document.getElementById("newOwnerSecret").textContent = f.owner_secret;
-    document.getElementById("createStep1").classList.add("hidden");
-    document.getElementById("createStep2").classList.remove("hidden");
+    if (authToken && authEmail === email) return await finishCreateFamily();
+    btn.textContent = "Sending\u2026";
+    await sendEmailCode(email);
+    document.getElementById("createCodeEmail").textContent = email;
+    document.getElementById("createCodeInput").value = "";
+    createErr("createCodeError", "");
+    showCreateStep("createStepCode");
+    setTimeout(() => document.getElementById("createCodeInput").focus(), 60);
   } catch (e) {
-    errEl.textContent = e.message;
-    errEl.classList.remove("hidden");
+    createErr("createError", e.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Send code";
+  }
+}
+
+// Step 2: check the emailed code, then create the family owned by that email.
+async function verifyAndCreate() {
+  const email = document.getElementById("createCodeEmail").textContent;
+  const code = document.getElementById("createCodeInput").value;
+  createErr("createCodeError", "");
+  const btn = document.getElementById("createVerifyBtn");
+  btn.disabled = true;
+  btn.textContent = "Checking\u2026";
+  try {
+    await verifyEmailCode(email, code);
+    await finishCreateFamily();
+  } catch (e) {
+    createErr("createCodeError", e.message);
   } finally {
     btn.disabled = false;
     btn.textContent = "Create family";
+  }
+}
+
+async function finishCreateFamily() {
+  const name = document.getElementById("newFamilyName").value.trim();
+  const { data, error } = await authClient().rpc("create_family_owned", { fname: name });
+  if (error || !data || !data.length) {
+    throw new Error((error && error.message) || "Couldn't create the family \u2014 try again.");
+  }
+  const f = data[0];
+  pendingFamily = { id: f.family_id, name: f.family_name };
+  track("family_created");
+  document.getElementById("newRoomCode").textContent = f.invite_code;
+  document.getElementById("newOwnerEmailShown").textContent = authEmail || "";
+  showCreateStep("createStep2");
+}
+
+/* Owner sign-in from the menu, for an existing family. */
+function ownerStep(id) {
+  ["ownerStepEmail", "ownerStepCode", "ownerStepClaim"].forEach(k =>
+    document.getElementById(k).classList.toggle("hidden", k !== id));
+}
+function openOwner() {
+  document.getElementById("menu").classList.add("hidden");
+  if (authEmail) {
+    authClient().auth.signOut().finally(() => {
+      authToken = null; authEmail = null;
+      updateOwnerMenu();
+      refreshOwner();
+      toast("Signed out.");
+    });
+    return;
+  }
+  ["ownerEmailError", "ownerCodeError", "ownerClaimError"].forEach(id => createErr(id, ""));
+  ownerStep("ownerStepEmail");
+  document.getElementById("ownerOverlay").classList.remove("hidden");
+  setTimeout(() => document.getElementById("ownerEmail").focus(), 60);
+}
+function closeOwner() { document.getElementById("ownerOverlay").classList.add("hidden"); }
+async function ownerSendCode() {
+  const email = document.getElementById("ownerEmail").value.trim().toLowerCase();
+  createErr("ownerEmailError", "");
+  if (!looksLikeEmail(email)) return createErr("ownerEmailError", "Enter the email you used for this family.");
+  const btn = document.getElementById("ownerSendBtn");
+  btn.disabled = true; btn.textContent = "Sending\u2026";
+  try {
+    await sendEmailCode(email);
+    document.getElementById("ownerCodeEmail").textContent = email;
+    document.getElementById("ownerCodeInput").value = "";
+    createErr("ownerCodeError", "");
+    ownerStep("ownerStepCode");
+    setTimeout(() => document.getElementById("ownerCodeInput").focus(), 60);
+  } catch (e) {
+    createErr("ownerEmailError", e.message);
+  } finally {
+    btn.disabled = false; btn.textContent = "Send code";
+  }
+}
+async function ownerVerify() {
+  const email = document.getElementById("ownerCodeEmail").textContent;
+  const btn = document.getElementById("ownerVerifyBtn");
+  createErr("ownerCodeError", "");
+  btn.disabled = true; btn.textContent = "Checking\u2026";
+  try {
+    await verifyEmailCode(email, document.getElementById("ownerCodeInput").value);
+    await refreshOwner();
+    if (isOwner) {
+      closeOwner();
+      toast("You\u2019re signed in as the owner of " + familyName + ".");
+    } else if (ownerInfo && !ownerInfo.has_owner) {
+      document.getElementById("ownerClaimInput").value = "";
+      ownerStep("ownerStepClaim");
+    } else {
+      closeOwner();
+      toast("Signed in, but " + familyName + " belongs to a different email.");
+    }
+  } catch (e) {
+    createErr("ownerCodeError", e.message);
+  } finally {
+    btn.disabled = false; btn.textContent = "Sign in";
+  }
+}
+async function ownerClaim() {
+  const key = document.getElementById("ownerClaimInput").value.trim();
+  createErr("ownerClaimError", "");
+  if (!key) return createErr("ownerClaimError", "Paste the owner key you saved when you set up the family.");
+  const { data, error } = await db.rpc("claim_family", { fid: familyId, secret: key });
+  if (error || !data) return createErr("ownerClaimError", "That key doesn\u2019t match this family.");
+  await refreshOwner();
+  closeOwner();
+  toast("Done. You\u2019re the owner of " + familyName + " now.");
+}
+
+/* Owner tools on each memory: approve (if not reviewed yet) and remove. */
+let entriesById = {};
+async function ownerAction(act, id, btn) {
+  const e = entriesById[id];
+  if (!e || !isOwner) return;
+  btn.disabled = true;
+  try {
+    if (act === "approve") {
+      const { data, error } = await db.from("entries").update({ status: "approved" }).eq("id", id).select("id");
+      if (error || !data || !data.length) throw error || new Error("not allowed");
+      toast("Approved.");
+    } else if (act === "remove") {
+      if (!confirm("Remove \u201c" + e.title + "\u201d and its photos for everyone? This can\u2019t be undone.")) {
+        btn.disabled = false;
+        return;
+      }
+      const paths = (e.photos || []).map(p => p.storage_path).filter(Boolean);
+      if (paths.length) await db.storage.from("family-photos").remove(paths);
+      const { data, error } = await db.from("entries").delete().eq("id", id).select("id");
+      if (error || !data || !data.length) throw error || new Error("not allowed");
+      toast("Removed.");
+    }
+    pingFamily();
+    loadTimeline();
+  } catch (err) {
+    console.error(err);
+    btn.disabled = false;
+    toast("That didn\u2019t work. Try signing in again from the menu.");
   }
 }
 
@@ -877,7 +1094,8 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!document.getElementById("lightbox").classList.contains("hidden")) return closeLightbox();
     if (!document.getElementById("entryModal").classList.contains("hidden")) return closeModal();
     if (!document.getElementById("shareOverlay").classList.contains("hidden")) return closeShare();
-    // Not on the "your family is ready" step: the owner key is only shown once.
+    if (!document.getElementById("ownerOverlay").classList.contains("hidden")) return closeOwner();
+    // Not on the "your family is ready" step, so the new family code isn't lost.
     if (!document.getElementById("createOverlay").classList.contains("hidden")) {
       if (document.getElementById("createStep2").classList.contains("hidden")) closeCreate();
       return;
@@ -917,6 +1135,39 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("landingBackBtn").onclick = hideLanding;
   document.getElementById("landingCodeLink").addEventListener("click", () =>
     setTimeout(() => document.getElementById("roomCodeInput").focus({ preventScroll: true }), 400));
+  document.getElementById("ownerBtn").onclick = openOwner;
+  document.getElementById("ownerCancelBtn").onclick = closeOwner;
+  document.getElementById("ownerSendBtn").onclick = ownerSendCode;
+  document.getElementById("ownerResendBtn").onclick = ownerSendCode;
+  document.getElementById("ownerCodeBackBtn").onclick = () => ownerStep("ownerStepEmail");
+  document.getElementById("ownerVerifyBtn").onclick = ownerVerify;
+  document.getElementById("ownerClaimBtn").onclick = ownerClaim;
+  document.getElementById("ownerClaimCancelBtn").onclick = closeOwner;
+  document.getElementById("ownerEmail").addEventListener("keydown", e => { if (e.key === "Enter") ownerSendCode(); });
+  document.getElementById("ownerCodeInput").addEventListener("keydown", e => { if (e.key === "Enter") ownerVerify(); });
+  document.getElementById("ownerOverlay").addEventListener("click", e => { if (e.target.id === "ownerOverlay") closeOwner(); });
+  document.getElementById("timeline").addEventListener("click", e => {
+    const b = e.target.closest("[data-act]");
+    if (b) ownerAction(b.dataset.act, b.dataset.id, b);
+  });
+  document.getElementById("createVerifyBtn").onclick = verifyAndCreate;
+  document.getElementById("createResendBtn").onclick = () => {
+    sendEmailCode(document.getElementById("createCodeEmail").textContent)
+      .then(() => toast("New code sent."), e => createErr("createCodeError", e.message));
+  };
+  document.getElementById("createCodeBackBtn").onclick = () => showCreateStep("createStep1");
+  document.getElementById("createCodeInput").addEventListener("keydown", e => { if (e.key === "Enter") verifyAndCreate(); });
+  document.getElementById("newOwnerEmail").addEventListener("keydown", e => { if (e.key === "Enter") doCreateFamily(); });
+  // Pick up an owner session saved on this device (never blocks the rest of startup).
+  try {
+    authClient().auth.getSession().then(({ data }) => {
+      const ses = data && data.session;
+      authToken = ses ? ses.access_token : null;
+      authEmail = ses && ses.user ? ses.user.email : null;
+      updateOwnerMenu();
+      if (authToken && db) refreshOwner();
+    }, () => {});
+  } catch (e) { console.error(e); }
   document.getElementById("switchFamilyBtn").onclick = () => { menu.classList.add("hidden"); switchFamily(); };
   document.getElementById("welcomeSwitch").onclick = switchFamily;
 
@@ -952,8 +1203,6 @@ document.addEventListener("DOMContentLoaded", () => {
   });
   document.getElementById("copyCodeBtn").onclick = (e) =>
     copyToClipboard(document.getElementById("newRoomCode").textContent, e.target);
-  document.getElementById("copySecretBtn").onclick = (e) =>
-    copyToClipboard(document.getElementById("newOwnerSecret").textContent, e.target);
   document.getElementById("enterTimelineBtn").onclick = enterCreatedFamily;
   document.getElementById("demoBtn").onclick = joinDemo;
   document.getElementById("demoCreateBtn").onclick = openCreate;

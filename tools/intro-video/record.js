@@ -48,7 +48,10 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   await sleep(500);
   await cap("Start your family's timeline");
   await type('#newFamilyName', 'The Riveras', 70);
-  await sleep(300); await tap('#createGoBtn'); await sleep(1700);
+  await type('#newOwnerEmail', 'lucy@rivera.family', 35);
+  await sleep(200); await tap('#createGoBtn'); await sleep(900);
+  await type('#createCodeInput', '482913', 110);
+  await sleep(200); await tap('#createVerifyBtn'); await sleep(1700);
   await tap('#enterTimelineBtn'); await sleep(900);
 
   await cap('Add a memory in seconds');
