@@ -200,7 +200,11 @@ stable
 security definer
 set search_path = public
 as $$
-  select id, name from public.families where invite_code = code limit 1
+  -- codes match with or without the dash, spaces or capitals
+  select id, name from public.families
+   where regexp_replace(lower(invite_code), '[^a-z0-9]', '', 'g')
+       = regexp_replace(lower(code), '[^a-z0-9]', '', 'g')
+   limit 1
 $$;
 
 -- the joined family's links (membership is proven by the x-family-id header)
@@ -275,7 +279,9 @@ begin
   loop
     code := substring(md5(gen_random_uuid()::text) from 1 for 4) || '-' ||
             lpad(((floor(random() * 9000) + 1000)::int)::text, 4, '0');
-    exit when not exists (select 1 from public.families f where f.invite_code = code);
+    exit when not exists (select 1 from public.families f
+                           where regexp_replace(lower(f.invite_code), '[^a-z0-9]', '', 'g')
+                               = replace(code, '-', ''));
   end loop;
 
   insert into public.families (name, invite_code, owner_user_id, owner_email)
