@@ -5,8 +5,8 @@
  * what the database's row-level security allows: read/write the joined
  * family's own rows. There is no secret here.
  */
-const SUPABASE_URL = "https://ukrxoqsvyvlyeblubjeo.supabase.co";
-const SUPABASE_KEY = "sb_publishable_hXr3XBpmRYSDiJNiOzt6yw_DttyIY6y";
+const SUPABASE_URL = "https://wwnukictcnmhnuinsfpd.supabase.co";
+const SUPABASE_KEY = "sb_publishable_I22ycyv0ubXR1tKWw6rNAQ_ViniEnXl";
 
 // The timeline always shows 1930s → this decade, and reaches further back
 // (as far as the 1800s) only when a family has memories that old.
@@ -56,7 +56,7 @@ let rtChannel = null;   // realtime broadcast channel
  *     token below comes from the Cloudflare dashboard; empty turns it off.
  *     It's never loaded on friends links, so their share token isn't sent.
  *  2. track("entry_added") etc. counts actions in our own database
- *     (supabase/analytics.sql): just the action name, family id and time,
+ *     (supabase/schema.sql): just the action name, family id and time,
  *     never titles, stories, names or photos.
  */
 const CF_ANALYTICS_TOKEN = "9fd514ca51264ed99c880b007c965db3";

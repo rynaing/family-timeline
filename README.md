@@ -25,13 +25,13 @@ devices, photo uploads to private storage.
 - `*` marks fields that still need confirmation
 - **Share** button: a friends link (`?share=<token>`, events and dates only, read-only, no
   access code) and a family link (`?join=<family code>`, the full timeline). "Stop old friends
-  links" makes a new token. Database side: `supabase/share_links.sql`
+  links" makes a new token. Database side: `family_share_info()` and `shared_timeline()` in `supabase/schema.sql`
 
 ## Analytics
 
 - **Visitors / page views:** Cloudflare Web Analytics (free, no cookies). The site token is set
   in `CF_ANALYTICS_TOKEN` at the top of `app.js` (empty turns it off). It is never loaded on friends links.
-- **Actions:** `supabase/analytics.sql` (already applied) adds `app_events` and `log_event()`.
+- **Actions:** `app_events` and `log_event()` in `supabase/schema.sql`.
   The page logs joins, new families, memories, photos, share and backup clicks: action name,
   family id and time only. See the numbers with `select * from kintime_stats(30);` in the SQL editor.
 
@@ -40,22 +40,25 @@ devices, photo uploads to private storage.
 - `app.js` contains the Supabase URL and the **publishable** key. This is
   public by design — it can only do what row-level security allows.
 - Family owners sign in with a one-time code emailed by Supabase Auth
-  (`supabase/owner_email.sql`). Signed in, they get Approve and Remove on each memory;
+  (`supabase/schema.sql`). Signed in, they get Approve and Remove on each memory;
   the database checks `is_family_owner()` either way. Families made before this can be
   claimed once with their old owner key. Everyone else only ever needs the family code.
 
-## Owner email codes: Supabase setup
+## Supabase project
 
-1. **Authentication → Sign In / Providers → Email**: email sign-in on.
-2. **Authentication → Emails → SMTP**: add a custom sender (e.g. Resend, with
-   kintime.app verified). Supabase's built-in sender only delivers to your own team's
-   addresses and a couple of emails an hour, so real families won't get codes without it.
+Kintime has its own Supabase project (`wwnukictcnmhnuinsfpd`), separate from other apps,
+because a project can only send sign-in emails from one address. `supabase/schema.sql` is
+the whole database: tables, row-level security, storage bucket and functions. To set up a
+fresh project:
+
+1. Run `supabase/schema.sql` in the SQL editor, and put the project URL and publishable key
+   at the top of `app.js`.
+2. **Authentication → Emails → SMTP Settings**: custom SMTP through Resend (kintime.app is
+   verified there). Sender `hello@kintime.app`, name `Kintime`, host `smtp.resend.com`, port
+   `465`, username `resend`, password a Resend API key. Supabase's built-in sender only
+   delivers to your own team's addresses, so real families won't get codes without it.
 3. **Authentication → Emails → Templates**: in both "Magic link" and "Confirm signup",
    show the code, e.g. `<p>Your Kintime code is <strong>{{ .Token }}</strong></p>`.
-   This project is shared with another app, so keep the existing link in those
-   templates as well.
-4. Run `supabase/owner_email.sql` (it also stops anonymous family creation, so deploy
-   the matching `app.js` at the same time).
 
 ## Deploy to GitHub Pages
 
