@@ -54,11 +54,12 @@ fresh project:
 1. Run `supabase/schema.sql` in the SQL editor, and put the project URL and publishable key
    at the top of `app.js`.
 2. **Authentication → Emails → SMTP Settings**: custom SMTP through Resend (kintime.app is
-   verified there). Sender `hello@kintime.app`, name `Kintime`, host `smtp.resend.com`, port
+   verified there). Sender `no-reply@kintime.app`, name `Kintime`, host `smtp.resend.com`, port
    `465`, username `resend`, password a Resend API key. Supabase's built-in sender only
    delivers to your own team's addresses, so real families won't get codes without it.
 3. **Authentication → Emails → Templates**: in both "Magic link" and "Confirm signup",
    show the code, e.g. `<p>Your Kintime code is <strong>{{ .Token }}</strong></p>`.
+4. **Authentication → Sign In / Providers → Email**: Email OTP Length `6`.
 
 ## Deploy to GitHub Pages
 
