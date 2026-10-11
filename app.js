@@ -545,11 +545,16 @@ function renderEntry(e, urlMap) {
     html += '<div class="entry-photos">';
     photos.forEach(p => {
       const url = urlMap[p.id];
-      if (url) {
+      if (!url) return;
+      if (p.kind === "audio") {
+        html += '<audio controls preload="none" src="' + esc(url) + '" aria-label="Voice note: ' + esc(e.title) + '"></audio>';
+      } else if (p.kind === "video") {
+        html += '<video controls playsinline preload="metadata" src="' + esc(url) + '" aria-label="Video: ' + esc(e.title) + '"></video>';
+      } else {
         html += '<img src="' + esc(url) + '" alt="' + esc(p.caption || e.title) +
           '" loading="lazy" tabindex="0" title="Tap to enlarge" />';
-        if (p.caption) html += '<div class="photo-caption">' + esc(p.caption) + "</div>";
       }
+      if (p.caption) html += '<div class="photo-caption">' + esc(p.caption) + "</div>";
     });
     html += "</div>";
   }
@@ -673,6 +678,7 @@ function openModal() {
 function closeModal() {
   document.getElementById("entryModal").classList.add("hidden");
   document.getElementById("entryForm").reset();
+  discardRecording();
 }
 
 async function submitEntry(ev) {
@@ -693,6 +699,14 @@ async function submitEntry(ev) {
     const decade = entryDate ? Math.floor(parseInt(entryDate.slice(0, 4), 10) / 10) * 10 + "s" : roughDecade;
     if (createdBy) localStorage.setItem(LS_NAME, createdBy);
 
+    // Check attachments before saving anything, so a too-long clip doesn't
+    // leave a memory behind without its files.
+    const files = [...document.getElementById("fPhotos").files];
+    if (recording) await stopRecording();
+    if (recBlob) files.push(recBlob);
+    if (files.length > MAX_FILES) throw new UserError("A memory can hold up to " + MAX_FILES + " photos, recordings or clips.");
+    for (const f of files) await checkAttachment(f);
+
     // Status is forced to 'pending' by the database trigger (review queue).
     const { data: rows, error } = await db.from("entries").insert({
       family_id: familyId,
@@ -708,26 +722,30 @@ async function submitEntry(ev) {
     entrySaved = true;
     track("entry_added");
 
-    // Photos → private bucket at <family_id>/<entry_id>/<unique-name>.
+    // Files → private bucket at <family_id>/<entry_id>/<unique-name>.
     // The unique suffix avoids collisions when two files share a basename
     // (e.g. IMG_001.jpg from different folders), which used to make the
     // second upload throw *after* the entry was already saved.
-    const files = document.getElementById("fPhotos").files;
     for (let i = 0; i < files.length; i++) {
-      if (files.length > 1) btn.textContent = "Uploading photo " + (i + 1) + " of " + files.length + "\u2026";
-      const file = await shrinkPhoto(files[i]);
+      if (files.length > 1) btn.textContent = "Uploading " + (i + 1) + " of " + files.length + "\u2026";
+      const kind = mediaKind(files[i]);
+      const file = kind === "photo" ? await shrinkPhoto(files[i]) : files[i];
       const uniq = Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 8);
-      const path = familyId + "/" + entryId + "/" + uniq + "-" + file.name;
-      const { error: upErr } = await db.storage.from("family-photos").upload(path, file);
-      if (upErr) throw upErr;
+      const path = familyId + "/" + entryId + "/" + uniq + "-" + file.name.replace(/[^\w.-]+/g, "_");
+      const { error: upErr } = await db.storage.from("family-photos").upload(path, file, { contentType: file.type || undefined });
+      // The upload rule refuses files once a family's storage is full.
+      if (upErr) throw /row-level security|policy/i.test(upErr.message || "")
+        ? new UserError("This family\u2019s storage is full, so the memory was saved without that file.")
+        : upErr;
       const { error: phErr } = await db.from("photos").insert({
         family_id: familyId,
         entry_id: entryId,
         storage_path: path,
         caption: null,
+        kind,
       });
       if (phErr) throw phErr;
-      track("photo_uploaded");
+      if (kind === "photo") track("photo_uploaded");
     }
 
     closeModal();
@@ -736,13 +754,147 @@ async function submitEntry(ev) {
     loadTimeline();
   } catch (e) {
     console.error(e);
-    toast(entrySaved
-      ? "Entry saved, but a photo failed to upload \u2014 check your connection and try adding it again."
+    const limit = limitMessage(e);
+    toast(limit ? limit
+      : entrySaved
+      ? "Entry saved, but a file failed to upload \u2014 check your connection and try adding it again."
       : "Couldn\u2019t save that entry. Try again.");
+    if (entrySaved) { closeModal(); pingFamily(); loadTimeline(); }
   } finally {
     btn.disabled = false;
     btn.textContent = "Save";
   }
+}
+
+/* ---------------- voice notes and video clips ----------------
+ * Limits match the database: 10 files a memory, 40 MB a file. Clips are
+ * capped at 15 seconds and voice notes at 5 minutes, checked here before
+ * anything is saved. */
+const MAX_FILES = 10;
+const MAX_FILE_BYTES = 40 * 1024 * 1024;
+const MAX_VIDEO_SECONDS = 15;
+const MAX_VOICE_SECONDS = 5 * 60;
+
+class UserError extends Error {}
+
+// The database's limit errors start with "kintime_limit: "; show the rest.
+function limitMessage(e) {
+  if (e instanceof UserError) return e.message;
+  const m = /kintime_limit:\s*(.+)/.exec((e && e.message) || "");
+  return m ? m[1] : null;
+}
+
+function mediaKind(file) {
+  const t = file.type || "";
+  if (t.startsWith("video/")) return "video";
+  if (t.startsWith("audio/")) return "audio";
+  return "photo";
+}
+
+function mediaDuration(file, kind) {
+  return new Promise(resolve => {
+    const el = document.createElement(kind);
+    const url = URL.createObjectURL(file);
+    const done = d => { URL.revokeObjectURL(url); resolve(d); };
+    el.preload = "metadata";
+    el.onloadedmetadata = () => done(el.duration);
+    el.onerror = () => done(NaN);
+    setTimeout(() => done(NaN), 8000);
+    el.src = url;
+  });
+}
+
+async function checkAttachment(file) {
+  const kind = mediaKind(file);
+  if (kind === "photo" && !/^image\//.test(file.type || "image/")) {
+    throw new UserError("\u201c" + file.name + "\u201d isn\u2019t a photo, video or audio file.");
+  }
+  if (file.size > MAX_FILE_BYTES) {
+    throw new UserError(kind === "video"
+      ? "That clip is too large. Try recording it at 1080p instead of 4K."
+      : "\u201c" + file.name + "\u201d is too large (40 MB max).");
+  }
+  if (kind === "video") {
+    const d = await mediaDuration(file, "video");
+    // A clip the browser can't read the length of is let through; size still caps it.
+    if (d > MAX_VIDEO_SECONDS + 0.5) {
+      throw new UserError("Video clips can be up to " + MAX_VIDEO_SECONDS + " seconds. That one is " + Math.round(d) + " seconds; trim it on your phone and try again.");
+    }
+  }
+}
+
+let recorder = null, recording = false, recBlob = null, recTimer = null, recStopResolve = null;
+
+function recMimeType() {
+  const types = ["audio/webm;codecs=opus", "audio/mp4", "audio/webm", "audio/ogg;codecs=opus"];
+  return (window.MediaRecorder && types.find(t => MediaRecorder.isTypeSupported(t))) || "";
+}
+
+async function toggleRecording() {
+  if (recording) { await stopRecording(); return; }
+  if (!navigator.mediaDevices || !window.MediaRecorder) {
+    toast("This browser can\u2019t record audio. You can attach a voice memo file instead.");
+    return;
+  }
+  let stream;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  } catch {
+    toast("Kintime needs microphone access to record. Check your browser\u2019s permissions.");
+    return;
+  }
+  discardRecording();
+  const mimeType = recMimeType();
+  recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+  const chunks = [];
+  recorder.ondataavailable = ev => { if (ev.data && ev.data.size) chunks.push(ev.data); };
+  recorder.onstop = () => {
+    stream.getTracks().forEach(t => t.stop());
+    const type = (recorder.mimeType || mimeType || "audio/webm").split(";")[0];
+    const ext = type.includes("mp4") ? "m4a" : type.includes("ogg") ? "ogg" : "webm";
+    recBlob = new File(chunks, "voice-note." + ext, { type });
+    const audio = document.getElementById("recAudio");
+    audio.src = URL.createObjectURL(recBlob);
+    document.getElementById("recPreview").classList.remove("hidden");
+    if (recStopResolve) { recStopResolve(); recStopResolve = null; }
+  };
+  recorder.start(1000);
+  recording = true;
+  const btn = document.getElementById("recBtn");
+  btn.classList.add("recording");
+  btn.textContent = "\u25A0 Stop recording";
+  const started = Date.now();
+  const tick = () => {
+    const sec = Math.floor((Date.now() - started) / 1000);
+    document.getElementById("recTime").textContent =
+      Math.floor(sec / 60) + ":" + String(sec % 60).padStart(2, "0") + " / 5:00";
+    if (sec >= MAX_VOICE_SECONDS) stopRecording();
+  };
+  tick();
+  recTimer = setInterval(tick, 500);
+}
+
+function stopRecording() {
+  if (!recording) return Promise.resolve();
+  recording = false;
+  clearInterval(recTimer);
+  const btn = document.getElementById("recBtn");
+  btn.classList.remove("recording");
+  btn.textContent = "\u{1F399} Record again";
+  return new Promise(resolve => { recStopResolve = resolve; recorder.stop(); });
+}
+
+function discardRecording() {
+  if (recording) { recording = false; clearInterval(recTimer); recorder.onstop = null; recorder.stream.getTracks().forEach(t => t.stop()); recorder.stop(); }
+  recBlob = null;
+  const audio = document.getElementById("recAudio");
+  if (audio && audio.src) { URL.revokeObjectURL(audio.src); audio.removeAttribute("src"); }
+  const prev = document.getElementById("recPreview");
+  if (prev) prev.classList.add("hidden");
+  const btn = document.getElementById("recBtn");
+  if (btn) { btn.classList.remove("recording"); btn.textContent = "\u{1F399} Record a voice note"; }
+  const t = document.getElementById("recTime");
+  if (t) t.textContent = "";
 }
 
 /* Phone photos are often 4-10 MB. Scale them to at most 2000px on the long
@@ -804,7 +956,7 @@ function exportTimeline() {
           uncertain_fields: e.uncertain_fields,
           created_by: e.created_by,
           photos: (e.photos || []).map(p => ({
-            storage_path: p.storage_path, caption: p.caption,
+            storage_path: p.storage_path, caption: p.caption, kind: p.kind || "photo",
           })),
         })),
       };
@@ -1182,6 +1334,8 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("addEntryBtn").onclick = openModal;
   document.getElementById("cancelEntryBtn").onclick = closeModal;
   document.getElementById("entryForm").onsubmit = submitEntry;
+  document.getElementById("recBtn").onclick = toggleRecording;
+  document.getElementById("recDiscardBtn").onclick = discardRecording;
   document.getElementById("entryModal").addEventListener("click", (e) => {
     if (e.target.id === "entryModal") closeModal();
   });
