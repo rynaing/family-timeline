@@ -51,7 +51,8 @@ because a project can only send sign-in emails from one address. `supabase/schem
 the whole database: tables, row-level security, storage bucket and functions. To set up a
 fresh project:
 
-1. Run `supabase/schema.sql` in the SQL editor, and put the project URL and publishable key
+1. Run `supabase/schema.sql`, then `supabase/media_limits.sql` (voice notes, video clips and
+   the per-family limits), in the SQL editor, and put the project URL and publishable key
    at the top of `app.js`.
 2. **Authentication → Emails → SMTP Settings**: custom SMTP through Resend (kintime.app is
    verified there). Sender `no-reply@kintime.app`, name `Kintime`, host `smtp.resend.com`, port

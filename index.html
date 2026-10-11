@@ -283,9 +283,18 @@
           <label class="check"><input type="checkbox" value="birthplace" /> Birthplace</label>
           <label class="check"><input type="checkbox" value="date" /> Date</label>
         </fieldset>
-        <label>Photos
-          <input id="fPhotos" type="file" accept="image/*" multiple />
+        <label>Photos and video clips
+          <input id="fPhotos" type="file" accept="image/*,video/*,audio/*" multiple />
         </label>
+        <div class="rec-row">
+          <button type="button" id="recBtn" class="btn btn-small">&#127897; Record a voice note</button>
+          <span id="recTime" class="muted small" aria-live="polite"></span>
+        </div>
+        <div id="recPreview" class="rec-preview hidden">
+          <audio id="recAudio" controls></audio>
+          <button type="button" id="recDiscardBtn" class="btn btn-small">Remove</button>
+        </div>
+        <p class="muted small">Video clips can be up to 15 seconds, voice notes up to 5 minutes.</p>
         <p class="muted small">New entries appear right away with a "Not reviewed yet" badge.</p>
         <div class="modal-actions">
           <button type="button" id="cancelEntryBtn" class="btn">Cancel</button>
