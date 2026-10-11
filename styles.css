@@ -724,3 +724,15 @@ body.share-view #addEntryBtn, body.share-view #shareBtn, body.share-view #eyeBtn
 body.owner .owner-actions { display: flex; }
 .owner-actions .link-btn { color: var(--accent-deep); }
 body.demo .hide-in-demo { display: none; }
+
+/* Laptop screens: keep the hero short enough that the decade ribbon shows on landing. */
+@media (min-width: 861px) {
+  .landing-top { padding-block: 0.75rem; }
+  .hero { padding: 0.75rem 1.25rem 1.5rem; gap: 2rem; }
+  .hero-title { font-size: clamp(2.2rem, min(4.4vw, 6.4vh), 3.2rem); margin: 0.3rem 0 0.75rem; }
+  .hero-sub { font-size: 1.05rem; margin-bottom: 1.2rem; }
+  .hero-join { margin-top: 1.1rem; }
+  .hero-fine { margin-top: 0.75rem; }
+  /* the phone's height follows the window height (aspect 540:1168 plus its border) */
+  .phone { width: clamp(180px, calc((100vh - 260px) * 0.4623), 220px); border-width: 8px; border-radius: 36px; }
+}
