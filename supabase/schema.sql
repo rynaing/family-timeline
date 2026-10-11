@@ -15,6 +15,7 @@ create or replace function public.req_family_id()
 returns uuid
 language sql
 stable
+set search_path = public
 as $$
   select nullif(
     coalesce(
@@ -29,6 +30,7 @@ create or replace function public.req_owner_secret()
 returns text
 language sql
 stable
+set search_path = public
 as $$
   select nullif(
     coalesce(
@@ -94,6 +96,7 @@ create index if not exists app_events_created_idx on public.app_events (created_
 create or replace function public.force_pending()
 returns trigger
 language plpgsql
+set search_path = public
 as $$
 begin
   new.status := 'pending';
@@ -168,8 +171,11 @@ create policy photos_owner_delete on public.photos for delete to anon, authentic
 
 -- ---------- photo storage ----------
 
-insert into storage.buckets (id, name, public) values ('family-photos', 'family-photos', false)
-  on conflict (id) do nothing;
+-- photos only, at most 15 MB each (the app shrinks them to about 2000px first)
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+  values ('family-photos', 'family-photos', false, 15728640, array['image/*'])
+  on conflict (id) do update set file_size_limit = excluded.file_size_limit,
+                                 allowed_mime_types = excluded.allowed_mime_types;
 
 drop policy if exists photos_obj_select on storage.objects;
 create policy photos_obj_select on storage.objects for select to anon, authenticated
