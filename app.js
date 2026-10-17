@@ -458,7 +458,22 @@ function renderTimeline(entries, urlMap) {
       body.innerHTML = '<div class="decade-empty">No memories yet.</div>' +
         '<button class="link-btn add-here" data-dec="' + esc(dec) + '">+ Add one from the ' + esc(dec) + "</button>";
     } else {
-      list.forEach(e => body.appendChild(renderEntry(e, urlMap)));
+      body.classList.add("has-rail");
+      // Each memory hangs off a rail with its year, spaced by the years between
+      // them, so 1982, 1984 and 1987 step down instead of stacking evenly.
+      let prevYear = null;
+      list.forEach(e => {
+        const card = renderEntry(e, urlMap);
+        const y = e.entry_date ? parseInt(e.entry_date.slice(0, 4), 10) : NaN;
+        if (isNaN(y)) {
+          card.classList.add("no-year");
+        } else {
+          if (y !== prevYear) card.dataset.year = y;
+          if (prevYear !== null) card.style.setProperty("--step", Math.min(y - prevYear, 5));
+          prevYear = y;
+        }
+        body.appendChild(card);
+      });
     }
     section.appendChild(body);
 
