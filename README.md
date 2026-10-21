@@ -21,6 +21,17 @@ devices, photo uploads to private storage.
 - Photos are shrunk to 2000px JPEG in the browser before upload; tap a photo to view it full size
 - Link previews (`og.png`), favicon and home-screen icon
 - Plain-language privacy page (`privacy.html`), linked from the menu and the family-code screen
+- **People** (menu): name, relation, born, birthplace, came to America, passed away. Any
+  date can be just a year, or a full date (`1942-03-05` or `3/5/1942`). Each person's moments
+  show on the timeline. New people land as pending; the signed-in owner approves, edits
+  ("Edit" also clears "needs confirmation" ticks) or removes them in the People list
+- **Questions to ask** (menu): what to ask the elders next. *Missing facts* is worked out
+  from People and memories (no birthplace, only a year, anything marked "needs
+  confirmation") and clears itself once filled in; the owner gets "Fill in" right there.
+  *Conversation starters* are 19 questions (roots, school, coming to America, work and
+  family, things to keep); "Write it down" opens Add a memory with the title filled in.
+  Asked and "doesn't apply" marks are kept on that device only
+- Owners get "Mark confirmed" on memories with a "needs confirmation" tick
 - Privacy (eye) mode hides stories and photos for shoulder-surfers
 - `*` marks fields that still need confirmation
 - **Share** button: a friends link (`?share=<token>`, events and dates only, read-only, no
@@ -52,7 +63,8 @@ the whole database: tables, row-level security, storage bucket and functions. To
 fresh project:
 
 1. Run `supabase/schema.sql`, then `supabase/media_limits.sql` (voice notes, video clips and
-   the per-family limits), in the SQL editor, and put the project URL and publishable key
+   the per-family limits), then `supabase/people.sql` (people profiles, and at most 10 wrong
+   family codes per IP every 15 minutes), in the SQL editor, and put the project URL and publishable key
    at the top of `app.js`.
 2. **Authentication → Emails → SMTP Settings**: custom SMTP through Resend (kintime.app is
    verified there). Sender `no-reply@kintime.app`, name `Kintime`, host `smtp.resend.com`, port
@@ -61,6 +73,20 @@ fresh project:
 3. **Authentication → Emails → Templates**: in both "Magic link" and "Confirm signup",
    show the code, e.g. `<p>Your Kintime code is <strong>{{ .Token }}</strong></p>`.
 4. **Authentication → Sign In / Providers → Email**: Email OTP Length `6`.
+
+## Weekly backups
+
+`.github/workflows/backup.yml` runs every Sunday (or on demand from the Actions tab). It
+downloads one family's memories, people and every attached file, encrypts them with a
+passphrase, and keeps each backup as a workflow artifact for 90 days. Turn it on with two
+repository secrets under **Settings → Secrets and variables → Actions**:
+
+- `FAMILY_ID`: the family's id (it works as the family's read key, so keep it secret)
+- `BACKUP_PASSPHRASE`: a long passphrase; store it somewhere safe, since the backup can't
+  be opened without it
+
+To open a backup: download the artifact, unzip it, then
+`gpg -d family-backup-YYYY-MM-DD.tar.gz.gpg | tar xz`.
 
 ## Deploy to GitHub Pages
 
@@ -79,4 +105,9 @@ fresh project:
 - [ ] Upload a photo — it renders on the other device
 - [ ] Wrong code shows an error; switching family clears the session
 - [ ] Privacy eye mode hides stories/photos; dark mode persists
-- [ ] "Download a backup" saves a JSON file
+- [ ] "Download a backup" saves a JSON file (with people)
+- [ ] People: add one with a year-only birth; it shows on the timeline as "Not reviewed
+      yet"; signed in as owner, Edit and Approve work from the People list
+- [ ] Questions to ask: that person shows "exact birthday?"; "Write it down" pre-fills a
+      memory, and saving ticks the starter as asked
+- [ ] Eleven wrong family codes in a row get "Too many wrong codes"

@@ -38,17 +38,12 @@ const LS_FAMILY = "ft_family";   // { id, name }
 const LS_THEME  = "ft_theme";
 const LS_NAME   = "ft_name";     // "Your name" on the add form, remembered per device
 
-const UNCERTAIN_LABELS = {
-  birth_date: "birth date",
-  birth_year: "birth year",
-  birthplace: "birthplace",
-  date: "date",
-};
-
 let familyId = null;
 let familyName = "";
 let db = null;          // supabase client scoped to this family
 let rtChannel = null;   // realtime broadcast channel
+let people = [];        // this family's people (people.js has the helpers)
+let timelineEntries = []; // last loaded memories, for "Questions to ask"
 
 /* ---------------- analytics ----------------
  * Two free, cookie-free pieces:
@@ -115,7 +110,7 @@ function possessive(name) {
 }
 
 function uncertainLabel(f) {
-  return UNCERTAIN_LABELS[f] || String(f).replace(/_/g, " ");
+  return FT.uncertainLabel(f);
 }
 
 /* One client per family: every request carries the x-family-id header,
@@ -184,6 +179,7 @@ async function refreshOwner() {
   }
   document.body.classList.toggle("owner", isOwner);
   updateOwnerMenu();
+  if (!document.getElementById("peopleOverlay").classList.contains("hidden")) renderPeopleList();
 }
 function updateOwnerMenu() {
   const b = document.getElementById("ownerBtn");
@@ -249,6 +245,10 @@ async function joinWithCode(code) {
   try {
     const anon = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
     const { data, error } = await anon.rpc("join_family", { code });
+    if (error && /too many attempts/i.test(error.message || "")) {
+      toast("Too many wrong codes. Wait 15 minutes and try again.");
+      return;
+    }
     if (error || !data || !data.length) {
       joinError();
       return;
@@ -267,6 +267,8 @@ function enterFamily(fam) {
   // Coming from the home page while already in a family: drop the old one's live channel.
   if (rtChannel && db) { db.removeChannel(rtChannel); rtChannel = null; }
   firstRender = true;
+  people = [];
+  timelineEntries = [];
   familyId = fam.id;
   familyName = fam.name;
   db = makeClient(familyId);
@@ -310,6 +312,8 @@ function switchFamily() {
   if (!demoMode) localStorage.removeItem(LS_FAMILY);
   familyId = null; db = null;
   familyName = "";
+  people = [];
+  timelineEntries = [];
   firstRender = true;
   demoMode = false;
   isOwner = false;
@@ -408,6 +412,18 @@ async function loadTimeline() {
       .order("entry_date", { ascending: true, nullsFirst: true });
     if (error) throw error;
 
+    // People are optional: if the people table isn't there yet the query
+    // errors and the timeline shows memories alone.
+    const { data: ppl, error: pErr } = await db
+      .from("people")
+      .select("*")
+      .eq("family_id", familyId)
+      .neq("status", "rejected")
+      .order("name");
+    if (pErr) console.warn("people not loaded", pErr);
+    people = pErr ? [] : (ppl || []);
+    timelineEntries = entries || [];
+
     // Signed URLs for private photo storage (valid 1 hour).
     const allPhotos = [];
     (entries || []).forEach(e => (e.photos || []).forEach(p => allPhotos.push(p)));
@@ -418,7 +434,9 @@ async function loadTimeline() {
       if (data) urlMap[p.id] = data.signedUrl;
     }));
 
-    renderTimeline(entries || [], urlMap);
+    renderTimeline(withMilestones(entries || []), urlMap);
+    if (!document.getElementById("peopleOverlay").classList.contains("hidden")) renderPeopleList();
+    if (!document.getElementById("askOverlay").classList.contains("hidden")) renderAsk();
   } catch (e) {
     console.error(e);
     main.innerHTML = '<div class="state-msg">Couldn\u2019t load the timeline. Check your connection and try again.</div>';
@@ -426,6 +444,23 @@ async function loadTimeline() {
 }
 
 let firstRender = true;
+
+/* Memories plus the moments people imply (born, came to America, passed
+ * away), in date order. A moment with only a year sorts before that year's
+ * exact dates; memories with no date stay first, as before. */
+function withMilestones(entries) {
+  const items = entries.slice();
+  people.forEach(p => FT.personMilestones(p).forEach(m => items.push({
+    _m: m, decade: FT.decadeOfYear(m.year), entry_date: m.date,
+  })));
+  const key = it => it._m ? it._m.sortKey : (it.entry_date || "");
+  return items.sort((a, b) => key(a) < key(b) ? -1 : key(a) > key(b) ? 1 : 0);
+}
+
+function itemYear(e) {
+  if (e._m) return e._m.year;
+  return e.entry_date ? parseInt(e.entry_date.slice(0, 4), 10) : NaN;
+}
 
 function isHorizontal() {
   return getComputedStyle(document.getElementById("timeline")).flexDirection === "row";
@@ -464,7 +499,7 @@ function renderTimeline(entries, urlMap) {
       let prevYear = null;
       list.forEach(e => {
         const card = renderEntry(e, urlMap);
-        const y = e.entry_date ? parseInt(e.entry_date.slice(0, 4), 10) : NaN;
+        const y = itemYear(e);
         if (isNaN(y)) {
           card.classList.add("no-year");
         } else {
@@ -531,8 +566,10 @@ function setGapOpen(gap, open) {
 }
 
 function renderEntry(e, urlMap) {
+  if (e._m) return renderMilestone(e._m);
   const card = document.createElement("article");
   card.className = "entry";
+  if (e.id != null) card.dataset.entryId = e.id;
 
   let html = "";
   if (e.status === "pending") {
@@ -583,9 +620,32 @@ function renderEntry(e, urlMap) {
     entriesById[e.id] = e;
     html += '<div class="owner-actions">' +
       (e.status === "pending" ? '<button class="btn btn-small" data-act="approve" data-id="' + esc(String(e.id)) + '">Approve</button>' : "") +
+      (uf.length ? '<button class="btn btn-small" data-act="confirm" data-id="' + esc(String(e.id)) + '">Mark confirmed</button>' : "") +
       '<button class="link-btn" data-act="remove" data-id="' + esc(String(e.id)) + '">Remove</button></div>';
   }
 
+  card.innerHTML = html;
+  return card;
+}
+
+/* A person's moment on the timeline. Tapping it opens them under People. */
+function renderMilestone(m) {
+  const card = document.createElement("article");
+  card.className = "entry milestone milestone-" + m.kind;
+  card.dataset.personId = m.person.id;
+  card.tabIndex = 0;
+  let html = "";
+  if (m.person.status === "pending") html += '<span class="badge badge-pending">Not reviewed yet</span>';
+  const dateUnsure = m.uncertain.some(f => f !== "birthplace");
+  html += '<div class="entry-date">' + esc(FT.fmtFlex(m.date, m.year)) +
+    (dateUnsure ? ' <span class="asterisk">*</span>' : "") + "</div>";
+  html += "<h3>" + esc(m.title) + "</h3>";
+  const sub = [m.person.relation, m.place].filter(Boolean).join(" \u00b7 ");
+  if (sub) html += '<div class="entry-meta milestone-sub">' + esc(sub) + "</div>";
+  if (m.uncertain.length) {
+    html += '<div class="uncertain-note"><span class="asterisk">*</span> ' +
+      esc(m.uncertain.map(uncertainLabel).join(", ")) + " needs confirmation</div>";
+  }
   card.innerHTML = html;
   return card;
 }
@@ -693,6 +753,8 @@ function openModal() {
 function closeModal() {
   document.getElementById("entryModal").classList.add("hidden");
   document.getElementById("entryForm").reset();
+  document.getElementById("fBody").placeholder = "What happened? Who was there?";
+  pendingPromptId = null;
   discardRecording();
 }
 
@@ -763,6 +825,11 @@ async function submitEntry(ev) {
       if (kind === "photo") track("photo_uploaded");
     }
 
+    if (pendingPromptId) {
+      const st = askState();
+      st.asked[pendingPromptId] = true;
+      saveAskState(st);
+    }
     closeModal();
     toast("Added \u2014 it\u2019ll show as \u201cNot reviewed yet\u201d until reviewed.");
     pingFamily();
@@ -952,6 +1019,283 @@ function closeLightbox() {
   document.getElementById("lightboxImg").src = "";
 }
 
+/* ---------------- people ----------------
+ * A person holds the facts the timeline is for. Anyone in the family can
+ * add one (it lands as pending, like a memory); the signed-in owner can
+ * approve, edit and remove, and the database enforces that too. */
+
+let editingPersonId = null;
+
+function renderPeopleList(highlightId) {
+  const list = document.getElementById("peopleList");
+  if (!people.length) {
+    list.innerHTML = '<p class="muted">No one added yet. Start with the elders: ' +
+      "when and where they were born, and when they came to America.</p>";
+    return;
+  }
+  list.innerHTML = "";
+  people.forEach(p => {
+    const row = document.createElement("div");
+    row.className = "person-row" + (p.id === highlightId ? " highlight" : "");
+    let html = "";
+    if (p.status === "pending") html += '<span class="badge badge-pending">Not reviewed yet</span>';
+    html += '<div class="person-name">' + esc(p.name) +
+      (p.relation ? ' <span class="muted small">' + esc(p.relation) + "</span>" : "") + "</div>";
+    FT.personFacts(p).forEach(f => { html += '<div class="person-fact">' + esc(f) + "</div>"; });
+    const uf = Array.isArray(p.uncertain_fields) ? p.uncertain_fields : [];
+    if (uf.length) {
+      html += '<div class="uncertain-note"><span class="asterisk">*</span> ' +
+        esc(uf.map(uncertainLabel).join(", ")) + " needs confirmation</div>";
+    }
+    if (p.notes) html += '<div class="entry-body">' + esc(p.notes) + "</div>";
+    if (p.created_by) html += '<div class="entry-meta">' + esc("Added by " + p.created_by) + "</div>";
+    row.innerHTML = html;
+    if (isOwner) {
+      const actions = document.createElement("div");
+      actions.className = "person-actions";
+      if (p.status === "pending") actions.appendChild(smallButton("Approve", b => personAction("approve", p, b)));
+      actions.appendChild(smallButton("Edit", () => openPersonModal(p)));
+      actions.appendChild(smallButton("Remove", b => personAction("remove", p, b), "link-btn"));
+      row.appendChild(actions);
+    }
+    list.appendChild(row);
+  });
+  if (highlightId) {
+    const el = list.querySelector(".highlight");
+    if (el) el.scrollIntoView({ block: "center" });
+  }
+}
+
+function smallButton(label, onclick, cls) {
+  const b = document.createElement("button");
+  b.type = "button";
+  b.className = cls || "btn btn-small";
+  b.textContent = label;
+  b.onclick = () => onclick(b);
+  return b;
+}
+
+function openPeople(highlightId) {
+  renderPeopleList(highlightId);
+  document.getElementById("peopleOverlay").classList.remove("hidden");
+}
+function closePeople() {
+  document.getElementById("peopleOverlay").classList.add("hidden");
+}
+
+// person: edit that person (owner only); none: add a new one.
+function openPersonModal(person) {
+  const form = document.getElementById("personForm");
+  form.reset();
+  editingPersonId = person ? person.id : null;
+  if (person) FT.fillPersonForm(form, person);
+  document.getElementById("personModalTitle").textContent = person ? "Edit " + person.name : "Add a person";
+  document.getElementById("personByRow").classList.toggle("hidden", !!person);
+  document.getElementById("personPendingNote").classList.toggle("hidden", !!person);
+  document.getElementById("pBy").value = localStorage.getItem(LS_NAME) || "";
+  document.getElementById("personError").classList.add("hidden");
+  document.getElementById("personModal").classList.remove("hidden");
+  setTimeout(() => form.querySelector('[name="name"]').focus(), 60);
+}
+function closePersonModal() {
+  document.getElementById("personModal").classList.add("hidden");
+  editingPersonId = null;
+}
+
+async function submitPerson(ev) {
+  ev.preventDefault();
+  const errEl = document.getElementById("personError");
+  errEl.classList.add("hidden");
+  const { row, error: formErr } = FT.readPersonForm(document.getElementById("personForm"));
+  if (formErr) {
+    errEl.textContent = formErr;
+    errEl.classList.remove("hidden");
+    return;
+  }
+  const btn = document.getElementById("savePersonBtn");
+  btn.disabled = true;
+  const editing = editingPersonId;
+  try {
+    if (editing) {
+      const { data, error } = await db.from("people").update(row).eq("id", editing).select("id");
+      if (error || !data || !data.length) throw error || new Error("not allowed");
+    } else {
+      const by = document.getElementById("pBy").value.trim() || null;
+      if (by) localStorage.setItem(LS_NAME, by);
+      // Status is forced to 'pending' by the database trigger (review queue).
+      const { error } = await db.from("people").insert({ ...row, created_by: by, family_id: familyId });
+      if (error) throw error;
+    }
+    closePersonModal();
+    toast(editing ? "Saved." : "Added. They\u2019ll show as \u201cNot reviewed yet\u201d until reviewed.");
+    pingFamily();
+    await loadTimeline();
+  } catch (e) {
+    console.error(e);
+    errEl.textContent = editing
+      ? "Couldn\u2019t save. Try signing in again from the menu."
+      : (limitMessage(e) || "Couldn\u2019t save that person. Try again.");
+    errEl.classList.remove("hidden");
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function personAction(act, p, btn) {
+  if (!isOwner) return;
+  btn.disabled = true;
+  try {
+    if (act === "approve") {
+      const { data, error } = await db.from("people").update({ status: "approved" }).eq("id", p.id).select("id");
+      if (error || !data || !data.length) throw error || new Error("not allowed");
+      toast("Approved.");
+    } else if (act === "remove") {
+      if (!confirm("Remove " + p.name + " for everyone? This can\u2019t be undone.")) {
+        btn.disabled = false;
+        return;
+      }
+      const { data, error } = await db.from("people").delete().eq("id", p.id).select("id");
+      if (error || !data || !data.length) throw error || new Error("not allowed");
+      toast("Removed.");
+    }
+    pingFamily();
+    await loadTimeline();
+  } catch (err) {
+    console.error(err);
+    btn.disabled = false;
+    toast("That didn\u2019t work. Try signing in again from the menu.");
+  }
+}
+
+/* ---------------- questions to ask ----------------
+ * Missing facts come from the people and memories already loaded, so they
+ * clear themselves once the answer is filled in. Which starters have been
+ * asked, and gaps marked "doesn't apply", are remembered on this device. */
+
+let askTab = "gaps";
+let pendingPromptId = null; // starter being written down; marked asked on save
+
+function askKey() { return "kt_ask_" + familyId; }
+function askState() {
+  try {
+    const s = JSON.parse(localStorage.getItem(askKey()) || "null");
+    return { asked: (s && s.asked) || {}, dismissed: (s && s.dismissed) || {} };
+  } catch { return { asked: {}, dismissed: {} }; }
+}
+function saveAskState(s) {
+  try { localStorage.setItem(askKey(), JSON.stringify(s)); } catch {}
+}
+
+function renderAsk() {
+  const state = askState();
+  const gaps = FT.allGaps(people, timelineEntries, state.dismissed);
+  const askedCount = FT.PROMPT_GROUPS.reduce((n, g) =>
+    n + g.prompts.filter(pr => state.asked[pr.id]).length, 0);
+  const tabGaps = document.getElementById("askTabGaps");
+  const tabPrompts = document.getElementById("askTabPrompts");
+  tabGaps.textContent = "Missing facts (" + gaps.length + ")";
+  tabPrompts.textContent = "Conversation starters (" + askedCount + "/" + FT.PROMPT_COUNT + ")";
+  tabGaps.classList.toggle("active", askTab === "gaps");
+  tabPrompts.classList.toggle("active", askTab === "prompts");
+  document.getElementById("askGaps").classList.toggle("hidden", askTab !== "gaps");
+  document.getElementById("askPrompts").classList.toggle("hidden", askTab !== "prompts");
+
+  const gapBox = document.getElementById("askGaps");
+  gapBox.innerHTML = "";
+  if (!gaps.length) {
+    gapBox.innerHTML = '<p class="muted">' + (people.length
+      ? "Nothing missing that we can spot. Try the conversation starters."
+      : "Add the elders under People (in the menu) and this list will show what\u2019s still unknown about each of them.") +
+      "</p>";
+  }
+  gaps.forEach(g => {
+    const row = document.createElement("div");
+    row.className = "ask-row";
+    const who = g.kind === "person"
+      ? [g.person.name, g.person.relation].filter(Boolean).join(" \u00b7 ")
+      : "Memory";
+    row.innerHTML = '<div class="ask-who">' + esc(who) + '</div><div class="ask-q">' + esc(g.q) + "</div>";
+    const actions = document.createElement("div");
+    actions.className = "ask-actions";
+    if (g.kind === "person" && isOwner) {
+      actions.appendChild(smallButton("Fill in", () => { closeAsk(); openPersonModal(g.person); }, "btn btn-small btn-primary"));
+    } else {
+      actions.appendChild(smallButton("Show", () => {
+        closeAsk();
+        if (g.kind === "person") openPeople(g.person.id);
+        else showEntry(g.entry.id);
+      }));
+    }
+    actions.appendChild(smallButton("Doesn\u2019t apply", () => {
+      const s = askState();
+      s.dismissed[g.key] = true;
+      saveAskState(s);
+      renderAsk();
+    }));
+    row.appendChild(actions);
+    gapBox.appendChild(row);
+  });
+  if (gaps.length && !isOwner) {
+    const hint = document.createElement("p");
+    hint.className = "muted small";
+    hint.textContent = "Got an answer? The family\u2019s owner can fill it in from People after signing in.";
+    gapBox.appendChild(hint);
+  }
+
+  const promptBox = document.getElementById("askPrompts");
+  promptBox.innerHTML = "";
+  FT.PROMPT_GROUPS.forEach(g => {
+    const head = document.createElement("div");
+    head.className = "ask-group";
+    head.textContent = g.label;
+    promptBox.appendChild(head);
+    g.prompts.forEach(pr => {
+      const asked = !!state.asked[pr.id];
+      const row = document.createElement("div");
+      row.className = "ask-row" + (asked ? " asked" : "");
+      row.innerHTML = '<div class="ask-q">' + esc(pr.q) + "</div>";
+      const actions = document.createElement("div");
+      actions.className = "ask-actions";
+      if (!demoMode) {
+        actions.appendChild(smallButton("Write it down", () => {
+          closeAsk();
+          openModal();
+          pendingPromptId = pr.id;
+          document.getElementById("fTitle").value = pr.title;
+          const body = document.getElementById("fBody");
+          body.placeholder = pr.q;
+          setTimeout(() => body.focus(), 80);
+        }, "btn btn-small btn-primary"));
+      }
+      actions.appendChild(smallButton(asked ? "Not asked yet" : "Mark asked", () => {
+        const s = askState();
+        if (asked) delete s.asked[pr.id]; else s.asked[pr.id] = true;
+        saveAskState(s);
+        renderAsk();
+      }));
+      row.appendChild(actions);
+      promptBox.appendChild(row);
+    });
+  });
+}
+
+function openAsk() {
+  renderAsk();
+  document.getElementById("askOverlay").classList.remove("hidden");
+}
+function closeAsk() {
+  document.getElementById("askOverlay").classList.add("hidden");
+}
+
+/* Scroll the timeline to a memory and flash it. */
+function showEntry(id) {
+  const card = document.querySelector('.entry[data-entry-id="' + CSS.escape(String(id)) + '"]');
+  if (!card) return;
+  card.scrollIntoView({ behavior: "smooth", inline: "center", block: "center" });
+  card.classList.add("flash");
+  setTimeout(() => card.classList.remove("flash"), 1800);
+}
+
 /* ---------------- export (backup) ---------------- */
 
 function exportTimeline() {
@@ -963,6 +1307,10 @@ function exportTimeline() {
       const payload = {
         family: familyName,
         exported_at: new Date().toISOString(),
+        people: people.map(p => {
+          const { id, family_id, created_at, ...rest } = p;
+          return rest;
+        }),
         entries: (data || []).map(e => ({
           title: e.title,
           body: e.body,
@@ -1176,6 +1524,10 @@ async function ownerAction(act, id, btn) {
       const { data, error } = await db.from("entries").update({ status: "approved" }).eq("id", id).select("id");
       if (error || !data || !data.length) throw error || new Error("not allowed");
       toast("Approved.");
+    } else if (act === "confirm") {
+      const { data, error } = await db.from("entries").update({ uncertain_fields: [] }).eq("id", id).select("id");
+      if (error || !data || !data.length) throw error || new Error("not allowed");
+      toast("Marked as confirmed.");
     } else if (act === "remove") {
       if (!confirm("Remove \u201c" + e.title + "\u201d and its photos for everyone? This can\u2019t be undone.")) {
         btn.disabled = false;
@@ -1315,8 +1667,28 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("ownerOverlay").addEventListener("click", e => { if (e.target.id === "ownerOverlay") closeOwner(); });
   document.getElementById("timeline").addEventListener("click", e => {
     const b = e.target.closest("[data-act]");
-    if (b) ownerAction(b.dataset.act, b.dataset.id, b);
+    if (b) return ownerAction(b.dataset.act, b.dataset.id, b);
+    const m = e.target.closest(".milestone");
+    if (m) openPeople(m.dataset.personId);
   });
+  document.getElementById("timeline").addEventListener("keydown", e => {
+    const m = e.target.closest(".milestone");
+    if (m && e.key === "Enter") openPeople(m.dataset.personId);
+  });
+
+  const closeMenu = () => document.getElementById("menu").classList.add("hidden");
+  document.getElementById("peopleBtn").onclick = () => { closeMenu(); openPeople(); };
+  document.getElementById("closePeopleBtn").onclick = closePeople;
+  document.getElementById("peopleOverlay").addEventListener("click", e => { if (e.target.id === "peopleOverlay") closePeople(); });
+  document.getElementById("addPersonBtn").onclick = () => openPersonModal();
+  document.getElementById("cancelPersonBtn").onclick = closePersonModal;
+  document.getElementById("personForm").onsubmit = submitPerson;
+  document.getElementById("personModal").addEventListener("click", e => { if (e.target.id === "personModal") closePersonModal(); });
+  document.getElementById("askBtn").onclick = () => { closeMenu(); openAsk(); };
+  document.getElementById("closeAskBtn").onclick = closeAsk;
+  document.getElementById("askOverlay").addEventListener("click", e => { if (e.target.id === "askOverlay") closeAsk(); });
+  document.getElementById("askTabGaps").onclick = () => { askTab = "gaps"; renderAsk(); };
+  document.getElementById("askTabPrompts").onclick = () => { askTab = "prompts"; renderAsk(); };
   document.getElementById("createVerifyBtn").onclick = verifyAndCreate;
   document.getElementById("createResendBtn").onclick = () => {
     sendEmailCode(document.getElementById("createCodeEmail").textContent)
