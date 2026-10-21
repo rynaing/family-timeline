@@ -42,6 +42,8 @@
 
   <div id="menu" class="menu hidden">
     <button id="menuHomeBtn">Kintime home page</button>
+    <button id="peopleBtn">People</button>
+    <button id="askBtn">Questions to ask</button>
     <button id="exportBtn">Download a backup (JSON)</button>
     <button id="menuThemeBtn" class="menu-phone-only">Dark mode on/off</button>
     <button id="ownerBtn" class="hide-in-demo">Owner sign-in</button>
@@ -309,10 +311,92 @@
     <img id="lightboxImg" alt="" />
     <p id="lightboxCaption"></p>
   </div>
+  <!-- People -->
+  <div id="peopleOverlay" class="overlay hidden">
+    <div class="card modal-card people-card">
+      <div class="people-head">
+        <h2>People</h2>
+        <button id="addPersonBtn" class="btn btn-primary btn-small hide-in-demo">&#43; Add person</button>
+      </div>
+      <p class="muted small">Birthdays, birthplaces, coming to America and passing dates show up on the timeline.</p>
+      <div id="peopleList"></div>
+      <div class="modal-actions">
+        <button type="button" id="closePeopleBtn" class="btn">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add or edit a person -->
+  <div id="personModal" class="overlay hidden">
+    <div class="card modal-card">
+      <h2 id="personModalTitle">Add a person</h2>
+      <form id="personForm" novalidate>
+        <label>Name
+          <input name="name" type="text" required maxlength="120" placeholder="e.g. Grandpa Tun" autocomplete="off" />
+        </label>
+        <label>Relation
+          <input name="relation" type="text" maxlength="60" placeholder="e.g. Grandfather (Dad&rsquo;s side)" autocomplete="off" />
+        </label>
+        <label>Born
+          <input name="birth" type="text" placeholder="1942, or 3/5/1942" inputmode="numeric" autocomplete="off" />
+        </label>
+        <label>Birthplace
+          <input name="birthplace" type="text" maxlength="120" placeholder="e.g. Rangoon, Burma" autocomplete="off" />
+        </label>
+        <label>Came to America
+          <input name="arrival" type="text" placeholder="1985, or 6/14/1985" inputmode="numeric" autocomplete="off" />
+        </label>
+        <label>Arrived in
+          <input name="arrival_place" type="text" maxlength="120" placeholder="e.g. San Francisco" autocomplete="off" />
+        </label>
+        <label>Passed away
+          <input name="death" type="text" placeholder="Leave empty if living" inputmode="numeric" autocomplete="off" />
+        </label>
+        <label>Notes
+          <textarea name="notes" rows="3" placeholder="Schools, work, stories worth keeping"></textarea>
+        </label>
+        <label id="personByRow">Your name
+          <input id="pBy" type="text" maxlength="60" placeholder="So family knows who added this" />
+        </label>
+        <fieldset class="uncertain">
+          <legend>Needs confirmation</legend>
+          <label class="check"><input type="checkbox" value="birth_date" /> Birth date</label>
+          <label class="check"><input type="checkbox" value="birthplace" /> Birthplace</label>
+          <label class="check"><input type="checkbox" value="arrival_date" /> Arrival date</label>
+          <label class="check"><input type="checkbox" value="death_date" /> Date of passing</label>
+        </fieldset>
+        <p class="muted small">A year on its own is fine when that&rsquo;s all anyone remembers.</p>
+        <p id="personError" class="error hidden"></p>
+        <p id="personPendingNote" class="muted small">New people appear right away with a "Not reviewed yet" badge.</p>
+        <div class="modal-actions">
+          <button type="button" id="cancelPersonBtn" class="btn">Cancel</button>
+          <button type="submit" id="savePersonBtn" class="btn btn-primary">Save</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Questions to ask -->
+  <div id="askOverlay" class="overlay hidden">
+    <div class="card modal-card ask-card">
+      <h2>Questions to ask</h2>
+      <p class="muted small">Bring these next time you sit down with the elders.</p>
+      <div class="ask-tabs" role="tablist">
+        <button type="button" id="askTabGaps" class="ask-tab active" role="tab">Missing facts</button>
+        <button type="button" id="askTabPrompts" class="ask-tab" role="tab">Conversation starters</button>
+      </div>
+      <div id="askGaps"></div>
+      <div id="askPrompts" class="hidden"></div>
+      <div class="modal-actions">
+        <button type="button" id="closeAskBtn" class="btn">Close</button>
+      </div>
+    </div>
+  </div>
 
   <div id="toast" class="toast hidden"></div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="people.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
